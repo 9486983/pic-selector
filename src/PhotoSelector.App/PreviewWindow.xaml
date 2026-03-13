@@ -1,0 +1,83 @@
+﻿<Window x:Class="PhotoSelector.App.PreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        WindowState="Maximized"
+        Background="Transparent"
+        AllowsTransparency="True"
+        ShowInTaskbar="False"
+        Topmost="True"
+        KeyDown="Window_OnKeyDown"
+        MouseLeftButtonDown="Window_OnMouseLeftButtonDown">
+    <Grid>
+        <Grid.Background>
+            <RadialGradientBrush GradientOrigin="0.5,0.45" Center="0.5,0.5" RadiusX="0.9" RadiusY="0.9">
+                <GradientStop Color="#DD233548" Offset="0"/>
+                <GradientStop Color="#EE10161D" Offset="1"/>
+            </RadialGradientBrush>
+        </Grid.Background>
+        <Border Margin="40" Background="#1A1E24" CornerRadius="10" BorderBrush="#33414E" BorderThickness="1">
+            <Grid ClipToBounds="True">
+                <Grid.Resources>
+                    <Style x:Key="NavHoverButton" TargetType="Button">
+                        <Setter Property="Opacity" Value="0.78"/>
+                        <Setter Property="IsHitTestVisible" Value="True"/>
+                        <Setter Property="Background" Value="#66253B4E"/>
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="BorderBrush" Value="#88A8C0"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                        <Setter Property="FontSize" Value="18"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="1"/>
+                                <Setter Property="Background" Value="#7B2E4A60"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                    <Style x:Key="PreviewStarButton" TargetType="Button">
+                        <Setter Property="Background" Value="#26384A"/>
+                        <Setter Property="BorderBrush" Value="#5F7D99"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                        <Setter Property="Foreground" Value="#F4C84A"/>
+                        <Setter Property="FontSize" Value="15"/>
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                    </Style>
+                </Grid.Resources>
+                <Image Name="PreviewImage"
+                       RenderTransformOrigin="0.5,0.5"
+                       MouseWheel="PreviewImage_OnMouseWheel"
+                       MouseLeftButtonDown="PreviewImage_OnMouseLeftButtonDown"
+                       MouseLeftButtonUp="PreviewImage_OnMouseLeftButtonUp"
+                       MouseMove="PreviewImage_OnMouseMove"
+                       Stretch="Uniform">
+                    <Image.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="ScaleTransform" ScaleX="1" ScaleY="1" />
+                            <TranslateTransform x:Name="TranslateTransform" X="0" Y="0" />
+                        </TransformGroup>
+                    </Image.RenderTransform>
+                </Image>
+
+                <Button Name="PrevButton" Width="44" Height="44" Content="❮" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12" Click="PrevButton_OnClick" Style="{StaticResource NavHoverButton}"/>
+                <Button Name="NextButton" Width="44" Height="44" Content="❯" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12" Click="NextButton_OnClick" Style="{StaticResource NavHoverButton}"/>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,16">
+                    <Button Name="Star1" Width="28" Height="28" Margin="0,0,2,0" Tag="1" Click="StarButton_OnClick" Content="☆" Style="{StaticResource PreviewStarButton}"/>
+                    <Button Name="Star2" Width="28" Height="28" Margin="0,0,2,0" Tag="2" Click="StarButton_OnClick" Content="☆" Style="{StaticResource PreviewStarButton}"/>
+                    <Button Name="Star3" Width="28" Height="28" Margin="0,0,2,0" Tag="3" Click="StarButton_OnClick" Content="☆" Style="{StaticResource PreviewStarButton}"/>
+                    <Button Name="Star4" Width="28" Height="28" Margin="0,0,2,0" Tag="4" Click="StarButton_OnClick" Content="☆" Style="{StaticResource PreviewStarButton}"/>
+                    <Button Name="Star5" Width="28" Height="28" Tag="5" Click="StarButton_OnClick" Content="☆" Style="{StaticResource PreviewStarButton}"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,16">
+                    <Ellipse Name="ColorDot1" Width="20" Height="20" Margin="4" Stroke="White" StrokeThickness="1"/>
+                    <Ellipse Name="ColorDot2" Width="20" Height="20" Margin="4" Stroke="White" StrokeThickness="1"/>
+                    <Ellipse Name="ColorDot3" Width="20" Height="20" Margin="4" Stroke="White" StrokeThickness="1"/>
+                    <Ellipse Name="ColorDot4" Width="20" Height="20" Margin="4" Stroke="White" StrokeThickness="1"/>
+                    <Ellipse Name="ColorDot5" Width="20" Height="20" Margin="4" Stroke="White" StrokeThickness="1"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

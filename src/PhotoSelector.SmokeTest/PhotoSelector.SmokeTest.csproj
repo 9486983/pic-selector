@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\PhotoSelector.Application\PhotoSelector.Application.csproj" />
+    <ProjectReference Include="..\PhotoSelector.Infrastructure\PhotoSelector.Infrastructure.csproj" />
+    <ProjectReference Include="..\PhotoSelector.Domain\PhotoSelector.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

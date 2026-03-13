@@ -1,0 +1,22 @@
+{
+  "score_weights": {
+    "sharpness": 0.35,
+    "exposure": 0.25,
+    "object": 0.2,
+    "face": 0.12,
+    "style": 0.08,
+    "person": 0.18
+  },
+  "waste_thresholds": {
+    "hard_blur": 0.025,
+    "soft_blur": 0.051000000000000004,
+    "bad_exposure": 0.1,
+    "very_low_score": 0.12,
+    "low_score_no_person": 0.174
+  },
+  "feedback_stats": {
+    "good_overruled_waste": 1,
+    "waste_overruled_good": 0,
+    "portrait_feedback": 1
+  }
+}

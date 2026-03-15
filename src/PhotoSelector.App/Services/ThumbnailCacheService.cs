@@ -4,6 +4,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Windows.Media.Imaging;
 
 namespace PhotoSelector.App.Services;
 
@@ -15,14 +16,14 @@ public sealed class ThumbnailCacheService
     public ThumbnailCacheService(string root)
     {
         _root = root;
-        Directory.CreateDirectory(_root);
+        System.IO.Directory.CreateDirectory(_root);
     }
 
     public string GetThumbnailPath(string sourcePath, string? libraryFolder = null)
     {
         var folderKey = BuildFolderKey(libraryFolder ?? Path.GetDirectoryName(sourcePath) ?? string.Empty);
         var targetDir = Path.Combine(_root, folderKey);
-        Directory.CreateDirectory(targetDir);
+        System.IO.Directory.CreateDirectory(targetDir);
 
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sourcePath))).ToLowerInvariant();
         return Path.Combine(targetDir, $"{hash}.jpg");
@@ -43,33 +44,43 @@ public sealed class ThumbnailCacheService
         await Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using var source = Image.FromFile(sourcePath);
-            ApplyExifOrientation(source);
-
-            var ratio = Math.Min((double)maxSide / source.Width, (double)maxSide / source.Height);
-            ratio = Math.Min(1.0, Math.Max(0.01, ratio));
-            var width = Math.Max(1, (int)Math.Round(source.Width * ratio));
-            var height = Math.Max(1, (int)Math.Round(source.Height * ratio));
-
-            using var thumb = new Bitmap(width, height);
-            using (var g = Graphics.FromImage(thumb))
+            try
             {
-                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                g.SmoothingMode = SmoothingMode.HighQuality;
-                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                g.DrawImage(source, 0, 0, width, height);
+                using var source = Image.FromFile(sourcePath);
+                ApplyExifOrientation(source);
+
+                var ratio = Math.Min((double)maxSide / source.Width, (double)maxSide / source.Height);
+                ratio = Math.Min(1.0, Math.Max(0.01, ratio));
+                var width = Math.Max(1, (int)Math.Round(source.Width * ratio));
+                var height = Math.Max(1, (int)Math.Round(source.Height * ratio));
+
+                using var thumb = new Bitmap(width, height);
+                using (var g = Graphics.FromImage(thumb))
+                {
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    g.SmoothingMode = SmoothingMode.HighQuality;
+                    g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g.DrawImage(source, 0, 0, width, height);
+                }
+
+                SaveJpeg(thumb, target);
+                return;
+            }
+            catch (OutOfMemoryException)
+            {
+                // Fall through to RAW-friendly paths.
+            }
+            catch
+            {
+                // Fall through to RAW-friendly paths.
             }
 
-            var encoder = GetJpegEncoder();
-            if (encoder is null)
+            if (TryCreateThumbnailWithWpf(sourcePath, target, maxSide))
             {
-                thumb.Save(target, ImageFormat.Jpeg);
                 return;
             }
 
-            using var qualityParams = new EncoderParameters(1);
-            qualityParams.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 82L);
-            thumb.Save(target, encoder, qualityParams);
+            CreatePlaceholder(target, maxSide);
         }, cancellationToken);
 
         return target;
@@ -123,5 +134,62 @@ public sealed class ThumbnailCacheService
     private static ImageCodecInfo? GetJpegEncoder()
     {
         return ImageCodecInfo.GetImageEncoders().FirstOrDefault(c => c.FormatID == ImageFormat.Jpeg.Guid);
+    }
+
+    private static void SaveJpeg(Image image, string target)
+    {
+        var encoder = GetJpegEncoder();
+        if (encoder is null)
+        {
+            image.Save(target, ImageFormat.Jpeg);
+            return;
+        }
+
+        using var qualityParams = new EncoderParameters(1);
+        qualityParams.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 82L);
+        image.Save(target, encoder, qualityParams);
+    }
+
+    private static bool TryCreateThumbnailWithWpf(string sourcePath, string target, int maxSide)
+    {
+        try
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.DecodePixelWidth = maxSide;
+            bitmap.UriSource = new Uri(sourcePath, UriKind.Absolute);
+            bitmap.EndInit();
+            bitmap.Freeze();
+
+            var encoder = new JpegBitmapEncoder();
+            encoder.QualityLevel = 82;
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using var stream = new FileStream(target, FileMode.Create, FileAccess.Write, FileShare.None);
+            encoder.Save(stream);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void CreatePlaceholder(string target, int maxSide)
+    {
+        try
+        {
+            var size = Math.Max(64, Math.Min(256, maxSide));
+            using var bmp = new Bitmap(size, size);
+            using var g = Graphics.FromImage(bmp);
+            g.Clear(Color.FromArgb(242, 242, 242));
+            using var pen = new Pen(Color.FromArgb(200, 210, 227), 2);
+            g.DrawRectangle(pen, 6, 6, size - 12, size - 12);
+            SaveJpeg(bmp, target);
+        }
+        catch
+        {
+            // Ignore placeholder failures.
+        }
     }
 }

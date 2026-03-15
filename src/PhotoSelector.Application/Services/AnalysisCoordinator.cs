@@ -47,6 +47,7 @@ public sealed class AnalysisCoordinator(IAiServiceClient aiClient)
     private static void ApplyResponse(PhotoItem photo, AnalyzeResponse response)
     {
         var existingRating = photo.Analysis.Rating;
+        var existingPerson = photo.Analysis.PersonLabel;
         photo.Analysis = new AnalysisAggregate
         {
             IsAnalyzed = true,
@@ -67,5 +68,19 @@ public sealed class AnalysisCoordinator(IAiServiceClient aiClient)
             PluginResults = response.Results,
             RawJson = response.RawJson
         };
+
+        if (!string.IsNullOrWhiteSpace(existingPerson)
+            && !existingPerson.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            var incoming = photo.Analysis.PersonLabel ?? string.Empty;
+            var incomingIsDefault = incoming.Equals("none", StringComparison.OrdinalIgnoreCase)
+                                    || incoming.StartsWith("person_", StringComparison.OrdinalIgnoreCase);
+            var existingIsNamed = !existingPerson.StartsWith("person_", StringComparison.OrdinalIgnoreCase);
+
+            if (incomingIsDefault || existingIsNamed)
+            {
+                photo.Analysis.PersonLabel = existingPerson;
+            }
+        }
     }
 }

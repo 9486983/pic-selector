@@ -17,100 +17,9 @@
     <Window.Resources>
         <conv:RatingStarConverter x:Key="RatingStarConverter" />
         <conv:HexToBrushConverter x:Key="HexToBrushConverter" />
-
-        <SolidColorBrush x:Key="UiBg" Color="#F5F7FB"/>
-        <SolidColorBrush x:Key="CardBg" Color="White"/>
-        <SolidColorBrush x:Key="CardBorder" Color="#D8DEE9"/>
-        <SolidColorBrush x:Key="Accent" Color="#2574A9"/>
-
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="#EEF3FA"/>
-            <Setter Property="BorderBrush" Value="#D5DFEE"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="Foreground" Value="#1B2430"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E2ECFA"/>
-                    <Setter Property="BorderBrush" Value="#C6D8F2"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#ECEFF4"/>
-                    <Setter Property="BorderBrush" Value="#D6DCE8"/>
-                    <Setter Property="Foreground" Value="#9AA4B2"/>
-                    <Setter Property="Opacity" Value="0.85"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#D5DFEE"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="8,4"/>
-        </Style>
-
-        <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#D5DFEE"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="6,2"/>
-            <Setter Property="Height" Value="30"/>
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#ECEFF4"/>
-                    <Setter Property="Foreground" Value="#9AA4B2"/>
-                    <Setter Property="BorderBrush" Value="#D6DCE8"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style TargetType="Slider">
-            <Setter Property="Foreground" Value="#2574A9"/>
-            <Setter Property="Height" Value="28"/>
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.45"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style TargetType="ListBox">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-        </Style>
-
-        <Style TargetType="ListBoxItem" x:Key="ThumbListBoxItemStyle">
-            <Setter Property="Margin" Value="0,0,10,10" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="VerticalContentAlignment" Value="Top" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="ItemBorder" BorderBrush="#D6DDE8" BorderThickness="1" CornerRadius="10" Background="White">
-                            <ContentPresenter />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#2574A9" />
-                                <Setter TargetName="ItemBorder" Property="BorderThickness" Value="2" />
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#EEF6FC" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <conv:StringHasValueToVisibilityConverter x:Key="StringHasValueToVisibilityConverter" />
+        <Style x:Key="ThumbListBoxItemStyleWithMenu" TargetType="ListBoxItem" BasedOn="{StaticResource ThumbListBoxItemStyle}">
+            <EventSetter Event="PreviewMouseRightButtonDown" Handler="PhotoListItem_OnPreviewMouseRightButtonDown"/>
         </Style>
     </Window.Resources>
 
@@ -196,7 +105,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="280" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="390" />
+                        <ColumnDefinition x:Name="DetailsColumn" Width="390" />
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,10,0" Background="{StaticResource CardBg}">
@@ -206,32 +115,50 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             <TextBlock Text="分类维度" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                            <TreeView Name="GroupList"
-                                      Grid.Row="1"
-                                      SelectedItemChanged="GroupTree_OnSelectedItemChanged"
-                                      ContextMenuOpening="GroupList_OnContextMenuOpening">
-                                <TreeView.ItemContainerStyle>
-                                    <Style TargetType="TreeViewItem">
-                                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
-                                    </Style>
-                                </TreeView.ItemContainerStyle>
-                                <TreeView.ContextMenu>
-                                    <ContextMenu/>
-                                </TreeView.ContextMenu>
-                                <TreeView.ItemTemplate>
-                                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <Ellipse Width="11"
-                                                     Height="11"
-                                                     Margin="0,0,6,0"
-                                                     Fill="{Binding ColorSwatch, Converter={StaticResource HexToBrushConverter}}"
-                                                     Stroke="#B4C1D1"
-                                                     StrokeThickness="0.5"/>
-                                            <TextBlock Text="{Binding Title}"/>
-                                        </StackPanel>
-                                    </HierarchicalDataTemplate>
-                                </TreeView.ItemTemplate>
-                            </TreeView>
+                            <Border Grid.Row="1" BorderBrush="#D6DDE8" BorderThickness="1" CornerRadius="12" Padding="6" Background="White">
+                                <TreeView Name="GroupList"
+                                          BorderThickness="0"
+                                          Background="Transparent"
+                                          SelectedItemChanged="GroupTree_OnSelectedItemChanged"
+                                          ContextMenuOpening="GroupList_OnContextMenuOpening">
+                                    <TreeView.ContextMenu>
+                                        <ContextMenu/>
+                                    </TreeView.ContextMenu>
+                                    <TreeView.ItemTemplate>
+                                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                            <Border x:Name="TreeItemBorder" CornerRadius="8" Padding="4">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="Transparent"/>
+                                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                                        <Setter Property="BorderThickness" Value="1"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsSelected}" Value="True">
+                                                                <Setter Property="Background" Value="Transparent"/>
+                                                                <Setter Property="BorderBrush" Value="#2574A9"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=IsMouseOver}" Value="True">
+                                                                <Setter Property="Background" Value="#F5F9FF"/>
+                                                                <Setter Property="BorderBrush" Value="#C6D8F2"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Ellipse Width="11"
+                                                             Height="11"
+                                                             Margin="0,0,6,0"
+                                                             Fill="{Binding ColorSwatch, Converter={StaticResource HexToBrushConverter}}"
+                                                             Stroke="#B4C1D1"
+                                                             StrokeThickness="0.5"
+                                                             Visibility="{Binding ColorSwatch, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                    <TextBlock Text="{Binding Title}" Foreground="#1B2430"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </HierarchicalDataTemplate>
+                                    </TreeView.ItemTemplate>
+                                </TreeView>
+                            </Border>
                         </Grid>
                     </Border>
 
@@ -242,31 +169,34 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,8">
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
                                 <TextBlock Name="FolderTitleText" VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold"/>
-                                <Border CornerRadius="16" Background="#ECF2FA" BorderBrush="#D7E1EF" BorderThickness="1" Padding="10,6" HorizontalAlignment="Right">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <TextBlock Text="排序" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <ComboBox Name="SortComboBox" Width="130" SelectionChanged="SortComboBox_OnSelectionChanged" SelectedIndex="0" Margin="0,0,10,0">
-                                            <ComboBoxItem Tag="overall_desc">综合分 ↓</ComboBoxItem>
-                                            <ComboBoxItem Tag="overall_asc">综合分 ↑</ComboBoxItem>
-                                            <ComboBoxItem Tag="sharpness_desc">清晰度 ↓</ComboBoxItem>
-                                            <ComboBoxItem Tag="exposure_desc">曝光 ↓</ComboBoxItem>
-                                            <ComboBoxItem Tag="face_desc">人数 ↓</ComboBoxItem>
-                                            <ComboBoxItem Tag="rating_desc">星级 ↓</ComboBoxItem>
-                                            <ComboBoxItem Tag="name_asc">文件名 ↑</ComboBoxItem>
-                                        </ComboBox>
-                                        <TextBlock Text="每排数量" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <Slider Name="ColumnsSlider" Minimum="1" Maximum="10" Value="5" Width="120" IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="ColumnsSlider_OnValueChanged"/>
-                                        <TextBlock Name="ColumnsText" Margin="6,0,0,0" VerticalAlignment="Center" MinWidth="20"/>
-                                    </StackPanel>
-                                </Border>
-                            </DockPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <ToggleButton Name="ToggleDetailsButton" Content="详情" Width="64" Height="30" Margin="0,0,12,0" Click="ToggleDetailsButton_OnClick"/>
+                                    <TextBlock Text="排序" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <ComboBox Name="SortComboBox" Width="130" SelectionChanged="SortComboBox_OnSelectionChanged" SelectedIndex="0" Margin="0,0,10,0">
+                                        <ComboBoxItem Tag="overall_desc">综合分 ↓</ComboBoxItem>
+                                        <ComboBoxItem Tag="overall_asc">综合分 ↑</ComboBoxItem>
+                                        <ComboBoxItem Tag="sharpness_desc">清晰度 ↓</ComboBoxItem>
+                                        <ComboBoxItem Tag="exposure_desc">曝光 ↓</ComboBoxItem>
+                                        <ComboBoxItem Tag="face_desc">人数 ↓</ComboBoxItem>
+                                        <ComboBoxItem Tag="rating_desc">星级 ↓</ComboBoxItem>
+                                        <ComboBoxItem Tag="name_asc">文件名 ↑</ComboBoxItem>
+                                    </ComboBox>
+                                    <TextBlock Text="每排数量" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <Slider Name="ColumnsSlider" Minimum="1" Maximum="10" Value="5" Width="120" IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="ColumnsSlider_OnValueChanged"/>
+                                    <TextBlock Name="ColumnsText" Margin="6,0,0,0" VerticalAlignment="Center" MinWidth="20"/>
+                                </StackPanel>
+                            </Grid>
 
                             <ListBox Name="PhotoList"
                                      Grid.Row="1"
                                      SelectionMode="Single"
-                                     ItemContainerStyle="{StaticResource ThumbListBoxItemStyle}"
+                                     ItemContainerStyle="{StaticResource ThumbListBoxItemStyleWithMenu}"
                                      SelectionChanged="PhotoList_OnSelectionChanged"
                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -277,7 +207,9 @@
                                 </ListBox.ItemsPanel>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid Width="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=PhotoCardWidth}">
+                                        <Grid Width="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}"
+                                              MaxWidth="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}"
+                                              ClipToBounds="True">
                                             <Grid.Resources>
                                                 <Style TargetType="Button" x:Key="HoverActionBtn">
                                                     <Setter Property="Opacity" Value="0"/>
@@ -295,33 +227,53 @@
                                                     <Setter Property="Foreground" Value="#D49B00"/>
                                                 </Style>
                                             </Grid.Resources>
-                                            <StackPanel Margin="6">
-                                                <Border Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=PhotoThumbHeight}" Background="#F2F2F2" CornerRadius="6">
+                                            <StackPanel Margin="8,8,8,6"
+                                                        HorizontalAlignment="Stretch"
+                                                        Width="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}"
+                                                        MaxWidth="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}">
+                                                <Border Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=PhotoThumbHeight}" Background="Transparent" CornerRadius="6" ClipToBounds="True">
                                                     <Image Source="{Binding Thumbnail}" Stretch="Uniform"/>
                                                 </Border>
                                                 <TextBlock Margin="0,6,0,0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding FileName}"/>
                                                 <TextBlock Foreground="#444" FontSize="12" Text="{Binding ScoreBadge}"/>
                                                 <TextBlock Foreground="#666" FontSize="12" Text="{Binding MetaBadge}" TextTrimming="CharacterEllipsis"/>
-                                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                                                    <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=1}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="1"/>
-                                                    <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=2}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="2"/>
-                                                    <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=3}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="3"/>
-                                                    <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=4}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="4"/>
-                                                    <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=5}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="5"/>
-                                                </StackPanel>
+                                                <Grid Margin="0,3,0,0"
+                                                      Name="ThumbFooterGrid"
+                                                      HorizontalAlignment="Stretch"
+                                                      ClipToBounds="True"
+                                                      MaxWidth="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}"
+                                                      Loaded="ThumbFooter_OnLoaded"
+                                                      SizeChanged="ThumbFooter_OnSizeChanged">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel x:Name="StarPanel" Orientation="Horizontal" Margin="0,0,8,0">
+                                                        <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=1}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="1"/>
+                                                        <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=2}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="2"/>
+                                                        <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=3}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="3"/>
+                                                        <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=4}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="4"/>
+                                                        <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=5}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="5"/>
+                                                    </StackPanel>
+                                                    <StackPanel x:Name="SwatchPanel" Grid.Column="1" Orientation="Horizontal" Margin="0,2,0,0" HorizontalAlignment="Right">
+                                                        <Ellipse Width="12" Height="12" Margin="0,2,4,0" Fill="{Binding Color1, Converter={StaticResource HexToBrushConverter}}" Visibility="{Binding Color1, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                        <Ellipse Width="12" Height="12" Margin="0,2,4,0" Fill="{Binding Color2, Converter={StaticResource HexToBrushConverter}}" Visibility="{Binding Color2, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                        <Ellipse Width="12" Height="12" Margin="0,2,4,0" Fill="{Binding Color3, Converter={StaticResource HexToBrushConverter}}" Visibility="{Binding Color3, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                        <Ellipse Width="12" Height="12" Margin="0,2,4,0" Fill="{Binding Color4, Converter={StaticResource HexToBrushConverter}}" Visibility="{Binding Color4, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                        <Ellipse Width="12" Height="12" Margin="0,2,0,0" Fill="{Binding Color5, Converter={StaticResource HexToBrushConverter}}" Visibility="{Binding Color5, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                    </StackPanel>
+                                                </Grid>
                                                 <TextBlock Foreground="#B00020" FontSize="12" Text="{Binding WasteBadge}" TextTrimming="CharacterEllipsis"/>
                                             </StackPanel>
 
                                             <Button Width="24" Height="24" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Style="{StaticResource HoverActionBtn}" Content="⛶" Click="FullscreenPreview_OnClick" CommandParameter="{Binding}" ToolTip="全屏预览"/>
                                             <Button Width="24" Height="24" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Style="{StaticResource HoverActionBtn}" Content="⋯" Click="OpenRowMenu_OnClick" CommandParameter="{Binding}" ToolTip="更多操作">
                                                 <Button.ContextMenu>
-                                                    <ContextMenu>
-                                                        <MenuItem Header="手动标记: 好片" Click="ManualTagGood_OnClick" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                                        <MenuItem Header="手动标记: 废片" Click="ManualTagWaste_OnClick" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                                        <MenuItem Header="手动标记: 人像" Click="ManualTagPortrait_OnClick" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                                        <Separator />
-                                                        <MenuItem Header="重新分析" Click="Reanalyze_OnClick" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-                                                    </ContextMenu>
+                                                    <ContextMenu/>
                                                 </Button.ContextMenu>
                                             </Button>
                                         </Grid>
@@ -331,7 +283,7 @@
                         </Grid>
                     </Border>
 
-                    <Grid Grid.Column="2">
+                    <Grid Grid.Column="2" Name="DetailsPanel" Width="390">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="360" />
                             <RowDefinition Height="*" />
@@ -348,6 +300,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
                                 <TextBlock Name="DetailOverallText" Grid.Row="0" Margin="0,0,0,6"/>
@@ -356,8 +309,18 @@
                                 <TextBlock Name="DetailFaceText" Grid.Row="3" Margin="0,0,0,6"/>
                                 <TextBlock Name="DetailClassText" Grid.Row="4" Margin="0,0,0,6"/>
                                 <TextBlock Name="DetailWasteText" Grid.Row="5" Margin="0,0,0,8"/>
-                                    <TextBox Name="DetailRawJsonText"
-                                             Grid.Row="6"
+                                <Border Name="ExifCard" Grid.Row="6" Background="#F8FAFD" BorderBrush="#D5DFEE" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock Text="拍摄参数" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                        <TextBlock Name="ExifIsoText" Margin="0,0,0,4"/>
+                                        <TextBlock Name="ExifApertureText" Margin="0,0,0,4"/>
+                                        <TextBlock Name="ExifShutterText" Margin="0,0,0,4"/>
+                                        <TextBlock Name="ExifFocalText" Margin="0,0,0,4"/>
+                                        <TextBlock Name="ExifCameraText"/>
+                                    </StackPanel>
+                                </Border>
+                                <TextBox Name="DetailRawJsonText"
+                                             Grid.Row="7"
                                              VerticalScrollBarVisibility="Auto"
                                              HorizontalScrollBarVisibility="Auto"
                                              TextWrapping="Wrap"

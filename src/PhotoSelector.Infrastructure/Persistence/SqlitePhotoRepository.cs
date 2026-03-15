@@ -95,7 +95,7 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
         var photoMap = new Dictionary<string, PhotoItem>(StringComparer.OrdinalIgnoreCase);
         var photoCmd = connection.CreateCommand();
         photoCmd.CommandText = """
-            SELECT Id, LibraryFolder, ThumbnailPath, Path, FileName, ImportedAt, CapturedAt, Iso, Aperture, ShutterSpeed, FocalLength, WhiteBalance, CameraModel, LensModel
+            SELECT Id, LibraryFolder, ThumbnailPath, Path, FileName, ImportedAt, CapturedAt, Iso, Aperture, ShutterSpeed, FocalLength, WhiteBalance, CameraMake, CameraModel, LensModel
             FROM Image
             ORDER BY ImportedAt DESC;
             """;
@@ -121,8 +121,9 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
                         ShutterSpeed = reader.IsDBNull(9) ? null : reader.GetString(9),
                         FocalLength = reader.IsDBNull(10) ? null : reader.GetString(10),
                         WhiteBalance = reader.IsDBNull(11) ? null : reader.GetString(11),
-                        CameraModel = reader.IsDBNull(12) ? null : reader.GetString(12),
-                        LensModel = reader.IsDBNull(13) ? null : reader.GetString(13),
+                        CameraMake = reader.IsDBNull(12) ? null : reader.GetString(12),
+                        CameraModel = reader.IsDBNull(13) ? null : reader.GetString(13),
+                        LensModel = reader.IsDBNull(14) ? null : reader.GetString(14),
                     }
                 };
                 result.Add(item);
@@ -204,8 +205,8 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
         var cmd = connection.CreateCommand();
         cmd.Transaction = (SqliteTransaction)tx;
         cmd.CommandText = """
-            INSERT INTO Image(Id, LibraryFolder, ThumbnailPath, Path, FileName, ImportedAt, CapturedAt, Iso, Aperture, ShutterSpeed, FocalLength, WhiteBalance, CameraModel, LensModel)
-            VALUES ($id, $libraryFolder, $thumbnailPath, $path, $fileName, $importedAt, $capturedAt, $iso, $aperture, $shutter, $focal, $whiteBalance, $camera, $lens)
+            INSERT INTO Image(Id, LibraryFolder, ThumbnailPath, Path, FileName, ImportedAt, CapturedAt, Iso, Aperture, ShutterSpeed, FocalLength, WhiteBalance, CameraMake, CameraModel, LensModel)
+            VALUES ($id, $libraryFolder, $thumbnailPath, $path, $fileName, $importedAt, $capturedAt, $iso, $aperture, $shutter, $focal, $whiteBalance, $cameraMake, $camera, $lens)
             ON CONFLICT(Id) DO UPDATE SET
                 LibraryFolder = excluded.LibraryFolder,
                 ThumbnailPath = excluded.ThumbnailPath,
@@ -218,6 +219,7 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
                 ShutterSpeed = excluded.ShutterSpeed,
                 FocalLength = excluded.FocalLength,
                 WhiteBalance = excluded.WhiteBalance,
+                CameraMake = excluded.CameraMake,
                 CameraModel = excluded.CameraModel,
                 LensModel = excluded.LensModel;
             """;
@@ -233,6 +235,7 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
         cmd.Parameters.AddWithValue("$shutter", (object?)photo.Metadata.ShutterSpeed ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$focal", (object?)photo.Metadata.FocalLength ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$whiteBalance", (object?)photo.Metadata.WhiteBalance ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$cameraMake", (object?)photo.Metadata.CameraMake ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$camera", (object?)photo.Metadata.CameraModel ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$lens", (object?)photo.Metadata.LensModel ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(cancellationToken);
@@ -330,6 +333,7 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
                 ShutterSpeed TEXT NULL,
                 FocalLength TEXT NULL,
                 WhiteBalance TEXT NULL,
+                CameraMake TEXT NULL,
                 CameraModel TEXT NULL,
                 LensModel TEXT NULL
             );
@@ -373,6 +377,7 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
         EnsureColumn(connection, "Image", "ShutterSpeed", "TEXT NULL");
         EnsureColumn(connection, "Image", "FocalLength", "TEXT NULL");
         EnsureColumn(connection, "Image", "WhiteBalance", "TEXT NULL");
+        EnsureColumn(connection, "Image", "CameraMake", "TEXT NULL");
         EnsureColumn(connection, "Image", "CameraModel", "TEXT NULL");
         EnsureColumn(connection, "Image", "LensModel", "TEXT NULL");
         EnsureColumn(connection, "Analysis", "IsAnalyzed", "INTEGER");

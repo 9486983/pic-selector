@@ -8,6 +8,7 @@ public sealed class PhotoMetadata
     public string? FocalLength { get; set; }
     public string? WhiteBalance { get; set; }
     public DateTimeOffset? CapturedAt { get; set; }
+    public string? CameraMake { get; set; }
     public string? CameraModel { get; set; }
     public string? LensModel { get; set; }
 }

@@ -1,9 +1,11 @@
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PhotoSelector.App.ViewModels;
@@ -15,6 +17,16 @@ namespace PhotoSelector.App;
 
 public partial class MainWindow
 {
+    private static readonly HashSet<string> RawExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".dng", ".rwa", ".arw", ".cr2", ".cr3", ".nef", ".rw2", ".orf", ".raf", ".sr2", ".srw", ".pef", ".3fr"
+    };
+
+    private static readonly HashSet<string> PreferredJpegExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg"
+    };
+
     private async Task OpenFolderFromRowAsync(LibraryFolderRow row)
     {
         if (row is null)
@@ -187,7 +199,8 @@ public partial class MainWindow
         var token = BeginOperation($"导入 {Path.GetFileName(folder)} ...");
         try
         {
-            var imported = await Task.Run(() => _importService.ImportFromDirectory(folder, recursive: true), token);
+            var targetFolder = PrepareImportFolder(folder, token);
+            var imported = await Task.Run(() => _importService.ImportFromDirectory(targetFolder, recursive: true), token);
             var newItems = new List<PhotoItem>();
             foreach (var item in imported)
             {
@@ -197,7 +210,7 @@ public partial class MainWindow
                     continue;
                 }
 
-                item.LibraryFolder = Path.GetFullPath(folder);
+                item.LibraryFolder = Path.GetFullPath(targetFolder);
                 _photos.Add(item);
                 _rows.Add(new PhotoRow(item));
                 newItems.Add(item);
@@ -206,7 +219,7 @@ public partial class MainWindow
             await EnsureThumbnailsAsync(newItems, "生成缩略图中", token);
             await SaveStateAsync(token);
             RebuildLibraries();
-            StatusText.Text = $"导入完成: {Path.GetFileName(folder)}，新增 {newItems.Count} 张";
+            StatusText.Text = $"导入完成: {Path.GetFileName(targetFolder)}，新增 {newItems.Count} 张";
         }
         catch (OperationCanceledException)
         {
@@ -218,6 +231,96 @@ public partial class MainWindow
         }
     }
 
+    private string PrepareImportFolder(string folder, CancellationToken token)
+    {
+        SortFilesByExtension(folder, token);
+
+        var jpgFolder = FindPreferredFolder(folder, PreferredJpegExtensions);
+        if (!string.IsNullOrWhiteSpace(jpgFolder))
+        {
+            return jpgFolder;
+        }
+
+        var rawFolder = FindPreferredFolder(folder, RawExtensions);
+        return string.IsNullOrWhiteSpace(rawFolder) ? folder : rawFolder;
+    }
+
+    private static void SortFilesByExtension(string folder, CancellationToken token)
+    {
+        if (!Directory.Exists(folder))
+        {
+            return;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.TopDirectoryOnly))
+        {
+            token.ThrowIfCancellationRequested();
+
+            var extension = Path.GetExtension(file);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                continue;
+            }
+
+            var normalized = extension.TrimStart('.').ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                continue;
+            }
+
+            var targetDir = Path.Combine(folder, normalized);
+            Directory.CreateDirectory(targetDir);
+
+            var destPath = Path.Combine(targetDir, Path.GetFileName(file));
+            destPath = GetAvailablePath(destPath);
+            File.Move(file, destPath);
+        }
+    }
+
+    private static string? FindPreferredFolder(string folder, IEnumerable<string> extensions)
+    {
+        foreach (var ext in extensions)
+        {
+            var name = ext.TrimStart('.').ToUpperInvariant();
+            var candidate = Path.Combine(folder, name);
+            if (!Directory.Exists(candidate))
+            {
+                continue;
+            }
+
+            if (Directory.EnumerateFiles(candidate, "*", SearchOption.TopDirectoryOnly).Any())
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static string GetAvailablePath(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return path;
+        }
+
+        var directory = Path.GetDirectoryName(path) ?? string.Empty;
+        var name = Path.GetFileNameWithoutExtension(path);
+        var extension = Path.GetExtension(path);
+        var index = 1;
+
+        while (true)
+        {
+            var candidate = Path.Combine(directory, $"{name}_{index}{extension}");
+            if (!File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            index++;
+        }
+    }
+
     private async Task EnsureThumbnailsAsync(IReadOnlyCollection<PhotoItem> photos, string stepMessage, CancellationToken token)
     {
         if (photos.Count == 0)
@@ -226,27 +329,46 @@ public partial class MainWindow
         }
 
         var list = photos.ToList();
-        for (var i = 0; i < list.Count; i++)
-        {
-            token.ThrowIfCancellationRequested();
-            var photo = list[i];
-            OperationText.Text = $"{stepMessage} {i + 1}/{list.Count}";
-            if (!File.Exists(photo.Path))
-            {
-                continue;
-            }
+        var maxParallel = Math.Clamp(Environment.ProcessorCount / 2, 2, 6);
+        using var gate = new SemaphoreSlim(maxParallel);
+        var processed = 0;
 
-            if (string.IsNullOrWhiteSpace(photo.ThumbnailPath) || !File.Exists(photo.ThumbnailPath))
+        var tasks = list.Select(async photo =>
+        {
+            await gate.WaitAsync(token);
+            try
             {
-                photo.ThumbnailPath = await _thumbnailCache.EnsureThumbnailAsync(
-                    photo.Path,
-                    960,
-                    photo.LibraryFolder,
-                    token);
-                var row = _rows.FirstOrDefault(r => r.Photo.Id == photo.Id);
-                row?.Refresh();
+                token.ThrowIfCancellationRequested();
+
+                var current = Interlocked.Increment(ref processed);
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    OperationText.Text = $"{stepMessage} {current}/{list.Count}";
+                });
+
+                if (!File.Exists(photo.Path))
+                {
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(photo.ThumbnailPath) || !File.Exists(photo.ThumbnailPath))
+                {
+                    photo.ThumbnailPath = await _thumbnailCache.EnsureThumbnailAsync(
+                        photo.Path,
+                        960,
+                        photo.LibraryFolder,
+                        token);
+                    var row = _rows.FirstOrDefault(r => r.Photo.Id == photo.Id);
+                    row?.Refresh();
+                }
             }
-        }
+            finally
+            {
+                gate.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
     }
 
     private async void AnalyzeSelectedButton_OnClick(object sender, RoutedEventArgs e)
@@ -331,6 +453,12 @@ public partial class MainWindow
             DetailFaceText.Text = string.Empty;
             DetailClassText.Text = string.Empty;
             DetailWasteText.Text = string.Empty;
+            ExifCard.Visibility = Visibility.Collapsed;
+            ExifIsoText.Text = string.Empty;
+            ExifApertureText.Text = string.Empty;
+            ExifShutterText.Text = string.Empty;
+            ExifFocalText.Text = string.Empty;
+            ExifCameraText.Text = string.Empty;
             DetailRawJsonText.Text = string.Empty;
             return;
         }
@@ -354,8 +482,57 @@ public partial class MainWindow
         DetailSharpnessText.Text = $"清晰度: {row.Sharpness:F3}";
         DetailExposureText.Text = $"曝光: {row.Photo.Analysis.ExposureScore:F3}";
         DetailFaceText.Text = $"人像计数: {row.FaceCount} / 人物: {GetPersonDisplayName(row.PersonLabel)}";
-        DetailClassText.Text = $"分类: {row.AutoClass} / 风格: {row.StyleLabel} / 颜色: {row.ColorLabel}";
+        var deviceLabel = string.IsNullOrWhiteSpace(row.Photo.Metadata.CameraModel) && string.IsNullOrWhiteSpace(row.Photo.Metadata.CameraMake)
+            ? string.Empty
+            : $" / 设备: {string.Join(' ', new[] { row.Photo.Metadata.CameraMake, row.Photo.Metadata.CameraModel }.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!.Trim()))}";
+        DetailClassText.Text = $"分类: {row.AutoClass} / 风格: {row.StyleLabel} / 颜色: {row.ColorLabel}{deviceLabel}";
         DetailWasteText.Text = row.IsWaste ? $"废片: {row.WasteReason}" : "废片: 否";
+
+        var meta = row.Photo.Metadata;
+        var hasExif = meta.Iso.HasValue
+                      || !string.IsNullOrWhiteSpace(meta.Aperture)
+                      || !string.IsNullOrWhiteSpace(meta.ShutterSpeed)
+                      || !string.IsNullOrWhiteSpace(meta.FocalLength)
+                      || !string.IsNullOrWhiteSpace(meta.CameraMake)
+                      || !string.IsNullOrWhiteSpace(meta.CameraModel)
+                      || !string.IsNullOrWhiteSpace(meta.LensModel);
+        if (hasExif)
+        {
+            ExifCard.Visibility = Visibility.Visible;
+            ExifIsoText.Text = meta.Iso.HasValue ? $"ISO: {meta.Iso.Value}" : string.Empty;
+            ExifIsoText.Visibility = meta.Iso.HasValue ? Visibility.Visible : Visibility.Collapsed;
+
+            ExifApertureText.Text = !string.IsNullOrWhiteSpace(meta.Aperture) ? $"光圈: {meta.Aperture}" : string.Empty;
+            ExifApertureText.Visibility = !string.IsNullOrWhiteSpace(meta.Aperture) ? Visibility.Visible : Visibility.Collapsed;
+
+            ExifShutterText.Text = !string.IsNullOrWhiteSpace(meta.ShutterSpeed) ? $"快门: {meta.ShutterSpeed}" : string.Empty;
+            ExifShutterText.Visibility = !string.IsNullOrWhiteSpace(meta.ShutterSpeed) ? Visibility.Visible : Visibility.Collapsed;
+
+            ExifFocalText.Text = !string.IsNullOrWhiteSpace(meta.FocalLength) ? $"焦距: {meta.FocalLength}" : string.Empty;
+            ExifFocalText.Visibility = !string.IsNullOrWhiteSpace(meta.FocalLength) ? Visibility.Visible : Visibility.Collapsed;
+
+            var cameraParts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(meta.CameraMake))
+            {
+                cameraParts.Add(meta.CameraMake);
+            }
+            if (!string.IsNullOrWhiteSpace(meta.CameraModel))
+            {
+                cameraParts.Add(meta.CameraModel);
+            }
+            if (!string.IsNullOrWhiteSpace(meta.LensModel))
+            {
+                cameraParts.Add(meta.LensModel);
+            }
+
+            var cameraText = cameraParts.Count > 0 ? $"设备: {string.Join(" / ", cameraParts)}" : string.Empty;
+            ExifCameraText.Text = cameraText;
+            ExifCameraText.Visibility = cameraParts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        else
+        {
+            ExifCard.Visibility = Visibility.Collapsed;
+        }
         DetailRawJsonText.Text = string.IsNullOrWhiteSpace(row.Photo.Analysis.RawJson)
             ? JsonSerializer.Serialize(row.Photo, new JsonSerializerOptions { WriteIndented = true })
             : row.Photo.Analysis.RawJson;
@@ -486,6 +663,33 @@ public partial class MainWindow
         ApplyFilters();
     }
 
+    private async Task AssignPersonAsync(PhotoRow row, string newName)
+    {
+        var label = row.PersonLabel ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(label) && label.StartsWith("person_", StringComparison.OrdinalIgnoreCase))
+        {
+            _personNames[label] = newName;
+            await SubmitPersonRenameAsync(label, newName);
+        }
+
+        row.Photo.Analysis.PersonLabel = newName;
+        row.Refresh();
+        await SavePersonNamesAsync();
+        await SubmitPersonAssignAsync(row.Path, newName);
+        await SaveStateAsync();
+        RebuildGroups();
+        ApplyFilters();
+    }
+
+    private async Task ClearPersonAsync(PhotoRow row)
+    {
+        row.Photo.Analysis.PersonLabel = "none";
+        row.Refresh();
+        await SaveStateAsync();
+        RebuildGroups();
+        ApplyFilters();
+    }
+
     private async void Reanalyze_OnClick(object sender, RoutedEventArgs e)
     {
         if (GetRowFromMenu(sender) is not { } row) return;
@@ -499,9 +703,208 @@ public partial class MainWindow
             return;
         }
 
+        if (button.CommandParameter is PhotoRow row)
+        {
+            PopulateRowMenu(menu, row);
+        }
+
         menu.Placement = PlacementMode.Bottom;
         menu.PlacementTarget = button;
         menu.IsOpen = true;
+    }
+
+    private void ToggleDetailsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Primitives.ToggleButton toggle)
+        {
+            return;
+        }
+
+        var show = toggle.IsChecked != false;
+        DetailsPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        DetailsColumn.Width = show ? new GridLength(390) : new GridLength(0);
+        toggle.Content = show ? "详情" : "展开";
+    }
+
+    private void ThumbFooter_OnSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is Grid grid)
+        {
+            UpdateThumbFooterLayout(grid);
+        }
+    }
+
+    private void ThumbFooter_OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Grid grid)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() => UpdateThumbFooterLayout(grid), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private static void UpdateThumbFooterLayout(Grid grid)
+    {
+        if (grid.FindName("StarPanel") is not FrameworkElement starPanel
+            || grid.FindName("SwatchPanel") is not FrameworkElement swatchPanel)
+        {
+            return;
+        }
+
+        starPanel.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+        swatchPanel.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+
+        var required = starPanel.DesiredSize.Width + swatchPanel.DesiredSize.Width + 8;
+        var available = grid.ActualWidth;
+        if (available <= 0)
+        {
+            var listBoxItem = FindAncestor<ListBoxItem>(grid);
+            if (listBoxItem is not null)
+            {
+                available = Math.Max(0, listBoxItem.ActualWidth - 16);
+            }
+        }
+        var wrap = available > 0 && required > available;
+
+        if (wrap)
+        {
+            Grid.SetRow(swatchPanel, 1);
+            Grid.SetColumn(swatchPanel, 0);
+            Grid.SetColumnSpan(swatchPanel, 2);
+            swatchPanel.HorizontalAlignment = System.Windows.HorizontalAlignment.Left;
+            swatchPanel.Margin = new Thickness(0, 2, 0, 0);
+        }
+        else
+        {
+            Grid.SetRow(swatchPanel, 0);
+            Grid.SetColumn(swatchPanel, 1);
+            Grid.SetColumnSpan(swatchPanel, 1);
+            swatchPanel.HorizontalAlignment = System.Windows.HorizontalAlignment.Right;
+            swatchPanel.Margin = new Thickness(0, 2, 0, 0);
+        }
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+
+    private void PhotoListItem_OnPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not ListBoxItem item || item.DataContext is not PhotoRow row)
+        {
+            return;
+        }
+
+        item.IsSelected = true;
+
+        var menu = new ContextMenu();
+        PopulateRowMenu(menu, row);
+        menu.Placement = PlacementMode.MousePoint;
+        menu.PlacementTarget = item;
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private void PopulateRowMenu(ContextMenu menu, PhotoRow row)
+    {
+        menu.Items.Clear();
+        BuildPersonMenu(menu, row);
+        menu.Items.Add(new Separator());
+
+        var goodItem = new MenuItem { Header = "手动标记: 好片", CommandParameter = row };
+        goodItem.Click += ManualTagGood_OnClick;
+        menu.Items.Add(goodItem);
+
+        var wasteItem = new MenuItem { Header = "手动标记: 废片", CommandParameter = row };
+        wasteItem.Click += ManualTagWaste_OnClick;
+        menu.Items.Add(wasteItem);
+
+        var portraitItem = new MenuItem { Header = "手动标记: 人像", CommandParameter = row };
+        portraitItem.Click += ManualTagPortrait_OnClick;
+        menu.Items.Add(portraitItem);
+
+        menu.Items.Add(new Separator());
+        var reanalyze = new MenuItem { Header = "重新分析", CommandParameter = row };
+        reanalyze.Click += Reanalyze_OnClick;
+        menu.Items.Add(reanalyze);
+    }
+
+    private void BuildPersonMenu(ContextMenu menu, PhotoRow row)
+    {
+        var personMenu = new MenuItem { Header = "人物标记" };
+        var hasPerson = !string.IsNullOrWhiteSpace(row.PersonLabel)
+                        && !row.PersonLabel.Equals("none", StringComparison.OrdinalIgnoreCase);
+        if (hasPerson)
+        {
+            var clear = new MenuItem { Header = "清除人物标记" };
+            clear.Click += async (_, _) => { await ClearPersonAsync(row); };
+            personMenu.Items.Add(clear);
+        }
+        else
+        {
+            var names = GetKnownPersonNames();
+            foreach (var name in names)
+            {
+                var item = new MenuItem { Header = name, Tag = name };
+                item.Click += async (_, _) =>
+                {
+                    await AssignPersonAsync(row, name);
+                };
+                personMenu.Items.Add(item);
+            }
+
+            var addNew = new MenuItem { Header = "新建..." };
+            addNew.Click += async (_, _) =>
+            {
+                var current = GetPersonDisplayName(row.PersonLabel);
+                var input = Microsoft.VisualBasic.Interaction.InputBox("请输入人物名称", "标记人物", current);
+                if (string.IsNullOrWhiteSpace(input))
+                {
+                    return;
+                }
+
+                await AssignPersonAsync(row, input.Trim());
+            };
+            personMenu.Items.Add(addNew);
+        }
+
+        menu.Items.Add(personMenu);
+    }
+
+    private List<string> GetKnownPersonNames()
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in _personNames.Values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                names.Add(value);
+            }
+        }
+
+        foreach (var row in _rows)
+        {
+            if (string.IsNullOrWhiteSpace(row.PersonLabel) || row.PersonLabel.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            names.Add(GetPersonDisplayName(row.PersonLabel));
+        }
+
+        return names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private void OpenLibraryMenu_OnClick(object sender, RoutedEventArgs e)

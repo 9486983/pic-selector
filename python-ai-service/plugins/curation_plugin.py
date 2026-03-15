@@ -65,31 +65,77 @@ class CurationPlugin(BasePlugin):
             b, g, r = centers[idx]
             colors.append(f"#{int(r):02X}{int(g):02X}{int(b):02X}")
 
-        top = centers[order[0]].astype(np.uint8)
-        hsv = cv2.cvtColor(np.array([[top]]), cv2.COLOR_BGR2HSV)[0][0]
-        hue = int(hsv[0])
-        sat = int(hsv[1])
-        val = int(hsv[2])
+        def is_neutral(hsv_val: np.ndarray) -> bool:
+            s = int(hsv_val[1])
+            v = int(hsv_val[2])
+            return s < 30 or v < 35 or v > 220
 
-        if sat < 26:
-            label = "gray"
-        elif val < 35:
-            label = "black"
-        elif hue < 10 or hue >= 170:
-            label = "red"
-        elif hue < 22:
-            label = "orange"
-        elif hue < 33:
-            label = "yellow"
-        elif hue < 78:
-            label = "green"
-        elif hue < 95:
-            label = "cyan"
-        elif hue < 131:
-            label = "blue"
-        elif hue < 160:
-            label = "purple"
-        else:
-            label = "magenta"
+        def label_from_hsv(hsv_val: np.ndarray) -> str:
+            hue = int(hsv_val[0])
+            sat = int(hsv_val[1])
+            val = int(hsv_val[2])
+            if sat < 26:
+                return "gray"
+            if val < 35:
+                return "black"
+            if hue < 10 or hue >= 170:
+                return "red"
+            if hue < 22:
+                return "orange"
+            if hue < 33:
+                return "yellow"
+            if hue < 78:
+                return "green"
+            if hue < 95:
+                return "cyan"
+            if hue < 131:
+                return "blue"
+            if hue < 160:
+                return "purple"
+            return "magenta"
 
+        hsv_small = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
+        v = hsv_small[:, :, 2]
+        shadow_mask = v < 70
+        mid_mask = (v >= 70) & (v < 180)
+        highlight_mask = v >= 180
+
+        def dominant_from_mask(mask: np.ndarray) -> np.ndarray | None:
+            if mask.sum() < 20:
+                return None
+            masked = small[mask]
+            if masked.size == 0:
+                return None
+            masked = masked.reshape(-1, 3).astype(np.float32)
+            kk = 3 if masked.shape[0] > 50 else 1
+            _, m_labels, m_centers = cv2.kmeans(masked, kk, None, criteria, 2, cv2.KMEANS_PP_CENTERS)
+            counts = np.bincount(m_labels.flatten(), minlength=kk)
+            idx = int(np.argmax(counts))
+            return m_centers[idx].astype(np.uint8)
+
+        def best_non_neutral(candidates: list[np.ndarray | None]) -> np.ndarray | None:
+            for cand in candidates:
+                if cand is None:
+                    continue
+                hsv = cv2.cvtColor(np.array([[cand]]), cv2.COLOR_BGR2HSV)[0][0]
+                if not is_neutral(hsv):
+                    return cand
+            return None
+
+        highlight = dominant_from_mask(highlight_mask)
+        midtone = dominant_from_mask(mid_mask)
+        shadow = dominant_from_mask(shadow_mask)
+
+        chosen = best_non_neutral([midtone, highlight, shadow])
+        if chosen is None:
+            chosen = centers[order[0]].astype(np.uint8)
+            for idx in order:
+                cand = centers[idx].astype(np.uint8)
+                hsv = cv2.cvtColor(np.array([[cand]]), cv2.COLOR_BGR2HSV)[0][0]
+                if not is_neutral(hsv):
+                    chosen = cand
+                    break
+
+        hsv = cv2.cvtColor(np.array([[chosen]]), cv2.COLOR_BGR2HSV)[0][0]
+        label = label_from_hsv(hsv)
         return label, colors

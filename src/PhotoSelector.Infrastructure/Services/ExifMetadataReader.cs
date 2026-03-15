@@ -37,6 +37,7 @@ public sealed class ExifMetadataReader : IPhotoMetadataReader
                 }
             }
 
+            metadata.CameraMake = exifIfd0?.GetDescription(ExifDirectoryBase.TagMake);
             metadata.CameraModel = exifIfd0?.GetDescription(ExifDirectoryBase.TagModel);
             return metadata;
         }

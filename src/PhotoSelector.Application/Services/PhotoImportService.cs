@@ -7,7 +7,8 @@ public sealed class PhotoImportService(IPhotoMetadataReader metadataReader)
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".cr2", ".nef", ".arw", ".dng"
+        ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff",
+        ".cr2", ".cr3", ".nef", ".arw", ".dng", ".rwa", ".rw2", ".orf", ".raf", ".sr2", ".srw", ".pef", ".3fr"
     };
 
     public IReadOnlyCollection<PhotoItem> ImportFromDirectory(string directory, bool recursive = true)

@@ -49,6 +49,8 @@ public partial class MainWindow : Window
         nameof(PhotoThumbHeight), typeof(double), typeof(MainWindow), new PropertyMetadata(140d));
     public static readonly DependencyProperty PhotoColumnsProperty = DependencyProperty.Register(
         nameof(PhotoColumns), typeof(int), typeof(MainWindow), new PropertyMetadata(5));
+    public static readonly DependencyProperty PhotoCardHeightProperty = DependencyProperty.Register(
+        nameof(PhotoCardHeight), typeof(double), typeof(MainWindow), new PropertyMetadata(260d));
 
     public double PhotoCardWidth
     {
@@ -66,6 +68,12 @@ public partial class MainWindow : Window
     {
         get => (int)GetValue(PhotoColumnsProperty);
         set => SetValue(PhotoColumnsProperty, value);
+    }
+
+    public double PhotoCardHeight
+    {
+        get => (double)GetValue(PhotoCardHeightProperty);
+        set => SetValue(PhotoCardHeightProperty, value);
     }
 
     public MainWindow()
@@ -87,6 +95,8 @@ public partial class MainWindow : Window
         _classArchivePath = Path.Combine(dataDir, "class_archives.json");
         _personNamesPath = Path.Combine(dataDir, "person_names.json");
         _photoRepository = new SqlitePhotoRepository(dbPath);
+
+        PhotoRow.PersonNameResolver = GetPersonDisplayName;
 
         PhotoList.ItemsSource = _visibleRows;
         GroupList.ItemsSource = _groups;
@@ -367,6 +377,7 @@ public partial class MainWindow : Window
         width = Math.Clamp(width, 76, 360);
         PhotoCardWidth = width;
         PhotoThumbHeight = Math.Clamp(width * 0.68, 64, 250);
+        PhotoCardHeight = PhotoThumbHeight + 120;
     }
 
     private async Task SubmitFeedbackAsync(PhotoRow row, string manualTag, string note)
@@ -383,6 +394,32 @@ public partial class MainWindow : Window
                 predicted_face_count = row.Photo.Analysis.FaceCount
             };
             await _httpClient.PostAsJsonAsync("/feedback", payload);
+        }
+        catch
+        {
+            // Best effort.
+        }
+    }
+
+    private async Task SubmitPersonRenameAsync(string oldLabel, string newLabel)
+    {
+        try
+        {
+            var payload = new { old_label = oldLabel, new_label = newLabel };
+            await _httpClient.PostAsJsonAsync("/person/rename", payload);
+        }
+        catch
+        {
+            // Best effort.
+        }
+    }
+
+    private async Task SubmitPersonAssignAsync(string imagePath, string newLabel)
+    {
+        try
+        {
+            var payload = new { image_path = imagePath, new_label = newLabel };
+            await _httpClient.PostAsJsonAsync("/person/assign", payload);
         }
         catch
         {

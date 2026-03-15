@@ -16,10 +16,26 @@ def _load_settings() -> dict:
 
 settings = _load_settings()
 engine_cfg = settings.get("engine", {})
+
+
+def _gpu_available() -> bool:
+    try:
+        import torch
+
+        return torch.cuda.is_available()
+    except Exception:
+        return False
+
+
+gpu_available = _gpu_available()
+default_gpu_workers = 2 if gpu_available else 1
+default_cpu_workers = 6 if gpu_available else 4
+default_batch_parallelism = 10 if gpu_available else 6
+
 engine = AIEngine(
-    gpu_workers=int(engine_cfg.get("gpu_workers", 1)),
-    cpu_workers=int(engine_cfg.get("cpu_workers", 4)),
-    batch_parallelism=int(engine_cfg.get("batch_parallelism", 6)),
+    gpu_workers=int(engine_cfg.get("gpu_workers", default_gpu_workers)),
+    cpu_workers=int(engine_cfg.get("cpu_workers", default_cpu_workers)),
+    batch_parallelism=int(engine_cfg.get("batch_parallelism", default_batch_parallelism)),
     score_weights=engine_cfg.get("score_weights", {}),
     waste_thresholds=engine_cfg.get("waste_thresholds", {}),
 )
@@ -41,6 +57,16 @@ class FeedbackRequest(BaseModel):
     predicted_is_waste: bool = False
     predicted_style: str = "unknown"
     predicted_face_count: int = 0
+
+
+class PersonRenameRequest(BaseModel):
+    old_label: str
+    new_label: str
+
+
+class PersonAssignRequest(BaseModel):
+    image_path: str
+    new_label: str
 
 
 @app.on_event("startup")
@@ -102,3 +128,21 @@ async def feedback(req: FeedbackRequest) -> dict:
         }
     except Exception as ex:
         raise HTTPException(status_code=500, detail=f"Feedback failed: {ex}") from ex
+
+
+@app.post("/person/rename")
+async def rename_person(req: PersonRenameRequest) -> dict:
+    try:
+        result = engine.rename_person(req.old_label, req.new_label)
+        return {"status": "ok", "result": result}
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=f"Rename failed: {ex}") from ex
+
+
+@app.post("/person/assign")
+async def assign_person(req: PersonAssignRequest) -> dict:
+    try:
+        result = engine.assign_person(req.image_path, req.new_label)
+        return {"status": "ok", "result": result}
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=f"Assign failed: {ex}") from ex

@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 from core.plugin_base import BasePlugin, PluginOutput
 
@@ -16,6 +17,7 @@ class YoloPlugin(BasePlugin):
         self._model = None
         self._error = None
         self._face_cascade = None
+        self._device = None
         try:
             from ultralytics import YOLO
 
@@ -24,6 +26,14 @@ class YoloPlugin(BasePlugin):
                 self._model = YOLO(str(model_path))
             else:
                 self._model = YOLO("yolov8n.pt")
+
+            try:
+                import torch
+
+                if torch.cuda.is_available():
+                    self._device = 0
+            except Exception:
+                self._device = None
         except Exception as ex:
             self._error = str(ex)
 
@@ -41,7 +51,10 @@ class YoloPlugin(BasePlugin):
                 features={"status": "fallback", "reason": self._error or "YOLO unavailable"},
             )
 
-        results = self._model.predict(image_path, verbose=False, conf=0.35)
+        if self._device is None:
+            results = self._model.predict(image_path, verbose=False, conf=0.35)
+        else:
+            results = self._model.predict(image_path, verbose=False, conf=0.35, device=self._device)
         result = results[0]
         objects: list[dict] = []
         person_count = 0
@@ -114,10 +127,7 @@ class YoloPlugin(BasePlugin):
             y = max(0, y)
             roi = image[y : y + h, x : x + w]
             if roi.size > 0:
-                hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-                hist = cv2.calcHist([hsv], [0, 1], None, [8, 8], [0, 180, 0, 256]).flatten()
-                norm = cv2.normalize(hist, None).flatten()
-                face_signature = [round(float(v), 6) for v in norm.tolist()]
+                face_signature = self._compute_face_signature(roi)
 
         if person_count <= 0 and face_count > 0:
             # Conservative fallback: face detector is used only to recover missing single-portrait cases.
@@ -151,3 +161,52 @@ class YoloPlugin(BasePlugin):
 
         union = float(aw * ah + bw * bh - inter) + 1e-8
         return inter / union
+
+    @staticmethod
+    def _compute_face_signature(roi: np.ndarray) -> list[float]:
+        try:
+            gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+            gray = cv2.resize(gray, (64, 64), interpolation=cv2.INTER_AREA)
+            gray = cv2.equalizeHist(gray)
+
+            hog = cv2.HOGDescriptor(
+                _winSize=(64, 64),
+                _blockSize=(16, 16),
+                _blockStride=(8, 8),
+                _cellSize=(8, 8),
+                _nbins=9,
+            )
+            hog_desc = hog.compute(gray).flatten()
+            lbp_hist = YoloPlugin._lbp_hist(gray)
+            vec = np.concatenate([hog_desc, lbp_hist]).astype(np.float32)
+            norm = float(np.linalg.norm(vec)) + 1e-8
+            vec = vec / norm
+            return [round(float(v), 6) for v in vec.tolist()]
+        except Exception:
+            return []
+
+    @staticmethod
+    def _lbp_hist(gray: np.ndarray) -> np.ndarray:
+        h, w = gray.shape
+        if h < 3 or w < 3:
+            return np.zeros(256, dtype=np.float32)
+
+        center = gray[1:-1, 1:-1]
+        lbp = np.zeros_like(center, dtype=np.uint8)
+        neighbors = [
+            gray[0:-2, 0:-2],
+            gray[0:-2, 1:-1],
+            gray[0:-2, 2:],
+            gray[1:-1, 2:],
+            gray[2:, 2:],
+            gray[2:, 1:-1],
+            gray[2:, 0:-2],
+            gray[1:-1, 0:-2],
+        ]
+
+        for idx, n in enumerate(neighbors):
+            lbp |= ((n >= center).astype(np.uint8) << (7 - idx))
+
+        hist = np.bincount(lbp.flatten(), minlength=256).astype(np.float32)
+        hist /= (hist.sum() + 1e-8)
+        return hist

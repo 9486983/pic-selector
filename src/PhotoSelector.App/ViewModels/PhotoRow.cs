@@ -13,6 +13,8 @@ public sealed class PhotoRow(PhotoItem photo) : INotifyPropertyChanged
 
     public PhotoItem Photo { get; } = photo;
 
+    public static Func<string, string>? PersonNameResolver { get; set; }
+
     public string FileName => Photo.FileName;
     public string Path => Photo.Path;
     public float OverallScore => Photo.Analysis.OverallScore;
@@ -29,9 +31,16 @@ public sealed class PhotoRow(PhotoItem photo) : INotifyPropertyChanged
     public string WasteReason => Photo.Analysis.WasteReason;
     public int Rating => Photo.Analysis.Rating;
     public BitmapImage? Thumbnail => _thumbnail ??= LoadBitmap(240);
+    public string Color1 => GetColorAt(0);
+    public string Color2 => GetColorAt(1);
+    public string Color3 => GetColorAt(2);
+    public string Color4 => GetColorAt(3);
+    public string Color5 => GetColorAt(4);
 
     public string ScoreBadge => IsAnalyzed ? $"{OverallScore:F2}" : "--";
-    public string MetaBadge => IsAnalyzed ? $"Face:{FaceCount} | {PersonLabel} | {StyleLabel} | {ColorLabel} | {AutoClass}" : "未分析";
+    public string MetaBadge => IsAnalyzed
+        ? $"Face:{FaceCount} | {ResolvePersonName()} | {StyleLabel} | {ColorLabel} | {AutoClass}"
+        : "未分析";
     public string WasteBadge => IsWaste ? $"废片: {WasteReason}" : string.Empty;
 
     public void Refresh()
@@ -53,6 +62,32 @@ public sealed class PhotoRow(PhotoItem photo) : INotifyPropertyChanged
         OnPropertyChanged(nameof(ScoreBadge));
         OnPropertyChanged(nameof(MetaBadge));
         OnPropertyChanged(nameof(WasteBadge));
+        OnPropertyChanged(nameof(Color1));
+        OnPropertyChanged(nameof(Color2));
+        OnPropertyChanged(nameof(Color3));
+        OnPropertyChanged(nameof(Color4));
+        OnPropertyChanged(nameof(Color5));
+    }
+
+    private string ResolvePersonName()
+    {
+        var label = PersonLabel;
+        if (PersonNameResolver is not null)
+        {
+            return PersonNameResolver(label);
+        }
+
+        return label;
+    }
+
+    private string GetColorAt(int index)
+    {
+        if (Photo.Analysis.DominantColors is null || Photo.Analysis.DominantColors.Count <= index)
+        {
+            return string.Empty;
+        }
+
+        return Photo.Analysis.DominantColors[index] ?? string.Empty;
     }
 
     private BitmapImage? LoadBitmap(int decodePixelWidth)

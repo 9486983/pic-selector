@@ -89,11 +89,20 @@ public partial class MainWindow
             .OrderBy(s => s)
             .ToList();
 
-        var personValues = scoped
-            .Where(r => r.IsAnalyzed && !string.IsNullOrWhiteSpace(r.PersonLabel) && !r.PersonLabel.Equals("none", StringComparison.OrdinalIgnoreCase))
-            .Select(r => r.PersonLabel)
+        var deviceValues = scoped
+            .Select(GetDeviceLabel)
+            .Where(label => !string.IsNullOrWhiteSpace(label))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(s => s)
+            .ToList();
+
+        var personGroups = scoped
+            .Where(r => r.IsAnalyzed
+                        && !string.IsNullOrWhiteSpace(r.PersonLabel)
+                        && !r.PersonLabel.Equals("none", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(r => GetPersonDisplayName(r.PersonLabel), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new { Name = g.Key, Count = g.Count() })
+            .OrderBy(g => g.Name)
             .ToList();
 
         _groups.Clear();
@@ -113,10 +122,13 @@ public partial class MainWindow
         faceRoot.Children.Add(new GroupNode { Key = "face:any", Title = $"有人脸 ({scoped.Count(r => r.FaceCount > 0)})" });
         faceRoot.Children.Add(new GroupNode { Key = "face:multi", Title = $"多人 ({scoped.Count(r => r.FaceCount > 1)})" });
         faceRoot.Children.Add(new GroupNode { Key = "face:none", Title = $"无人脸 ({scoped.Count(r => r.IsAnalyzed && r.FaceCount == 0)})" });
-        foreach (var person in personValues)
+        foreach (var person in personGroups)
         {
-            var count = scoped.Count(r => r.PersonLabel.Equals(person, StringComparison.OrdinalIgnoreCase));
-            faceRoot.Children.Add(new GroupNode { Key = $"person:{person}", Title = $"{GetPersonDisplayName(person)} ({count})" });
+            faceRoot.Children.Add(new GroupNode
+            {
+                Key = $"personname:{person.Name}",
+                Title = $"{person.Name} ({person.Count})"
+            });
         }
         _groups.Add(faceRoot);
 
@@ -145,6 +157,19 @@ public partial class MainWindow
             ratingRoot.Children.Add(new GroupNode { Key = $"rating:{star}", Title = $"{star} 星 ({count})" });
         }
         _groups.Add(ratingRoot);
+
+        var deviceRoot = new GroupNode
+        {
+            Key = "root:device",
+            Title = $"设备 ({deviceValues.Count})",
+            IsExpanded = expandState.TryGetValue("root:device", out var exDevice) ? exDevice : false
+        };
+        foreach (var device in deviceValues)
+        {
+            var count = scoped.Count(r => GetDeviceLabel(r).Equals(device, StringComparison.OrdinalIgnoreCase));
+            deviceRoot.Children.Add(new GroupNode { Key = $"device:{device}", Title = $"{device} ({count})" });
+        }
+        _groups.Add(deviceRoot);
 
         var styleRoot = new GroupNode
         {
@@ -206,10 +231,10 @@ public partial class MainWindow
                 _ => scoped,
             };
         }
-        else if (key.StartsWith("person:", StringComparison.OrdinalIgnoreCase))
+        else if (key.StartsWith("personname:", StringComparison.OrdinalIgnoreCase))
         {
-            var person = key["person:".Length..];
-            filtered = scoped.Where(r => r.PersonLabel.Equals(person, StringComparison.OrdinalIgnoreCase));
+            var person = key["personname:".Length..];
+            filtered = scoped.Where(r => GetPersonDisplayName(r.PersonLabel).Equals(person, StringComparison.OrdinalIgnoreCase));
         }
         else if (key.StartsWith("waste:", StringComparison.OrdinalIgnoreCase))
         {
@@ -225,6 +250,11 @@ public partial class MainWindow
         {
             var color = key["color:".Length..];
             filtered = scoped.Where(r => CanonicalGroup("color", r.ColorLabel).Equals(color, StringComparison.OrdinalIgnoreCase));
+        }
+        else if (key.StartsWith("device:", StringComparison.OrdinalIgnoreCase))
+        {
+            var device = key["device:".Length..];
+            filtered = scoped.Where(r => GetDeviceLabel(r).Equals(device, StringComparison.OrdinalIgnoreCase));
         }
         else if (key.StartsWith("rating:", StringComparison.OrdinalIgnoreCase))
         {
@@ -329,12 +359,33 @@ public partial class MainWindow
 
         GroupList.ContextMenu.Items.Clear();
 
-        if (selected.Key.StartsWith("person:", StringComparison.OrdinalIgnoreCase))
+        if (selected.Key.StartsWith("personname:", StringComparison.OrdinalIgnoreCase))
         {
-            var personId = selected.Key["person:".Length..];
-            var rename = new MenuItem { Header = "重命名人物", Tag = personId };
+            var personName = selected.Key["personname:".Length..];
+            var rename = new MenuItem { Header = "重命名人物", Tag = personName };
             rename.Click += RenamePerson_OnClick;
             GroupList.ContextMenu.Items.Add(rename);
+
+            var mergeTargets = _groups
+                .SelectMany(r => r.Children)
+                .Where(c => c.IsLeaf && c.Key.StartsWith("personname:", StringComparison.OrdinalIgnoreCase))
+                .Select(c => c.Key["personname:".Length..])
+                .Where(n => !n.Equals(personName, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(n => n)
+                .ToList();
+
+            if (mergeTargets.Count > 0)
+            {
+                var mergeMenu = new MenuItem { Header = "合并到..." };
+                foreach (var target in mergeTargets)
+                {
+                    var item = new MenuItem { Header = target, Tag = $"{personName}|{target}" };
+                    item.Click += MergePersonTo_OnClick;
+                    mergeMenu.Items.Add(item);
+                }
+                GroupList.ContextMenu.Items.Add(mergeMenu);
+            }
             return;
         }
 
@@ -376,28 +427,96 @@ public partial class MainWindow
 
     private async void RenamePerson_OnClick(object sender, RoutedEventArgs e)
     {
-        if ((sender as MenuItem)?.Tag is not string personId)
+        if ((sender as MenuItem)?.Tag is not string currentName)
         {
             return;
         }
 
-        var current = GetPersonDisplayName(personId);
-        var input = Microsoft.VisualBasic.Interaction.InputBox("请输入人物名称", "重命名人物", current);
+        var input = Microsoft.VisualBasic.Interaction.InputBox("请输入人物名称", "重命名人物", currentName);
         if (string.IsNullOrWhiteSpace(input))
         {
             return;
         }
 
-        _personNames[personId] = input.Trim();
-        foreach (var row in _rows.Where(r => r.PersonLabel.Equals(personId, StringComparison.OrdinalIgnoreCase)))
+        var newName = input.Trim();
+        var matchingIds = _rows
+            .Where(r => r.IsAnalyzed
+                        && !string.IsNullOrWhiteSpace(r.PersonLabel)
+                        && GetPersonDisplayName(r.PersonLabel).Equals(currentName, StringComparison.OrdinalIgnoreCase))
+            .Select(r => r.PersonLabel)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var personId in matchingIds)
         {
+            _personNames[personId] = newName;
+        }
+
+        foreach (var row in _rows.Where(r => GetPersonDisplayName(r.PersonLabel).Equals(currentName, StringComparison.OrdinalIgnoreCase)))
+        {
+            row.Photo.Analysis.PersonLabel = newName;
             row.Refresh();
         }
 
         await SavePersonNamesAsync();
+        foreach (var personId in matchingIds)
+        {
+            await SubmitPersonRenameAsync(personId, newName);
+        }
+        await SaveStateAsync();
         RebuildGroups();
         ApplyFilters();
-        StatusText.Text = $"人物已重命名: {current} -> {input.Trim()}";
+        StatusText.Text = $"人物已重命名: {currentName} -> {newName}";
+    }
+
+    private async void MergePersonTo_OnClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuItem)?.Tag is not string payload)
+        {
+            return;
+        }
+
+        var parts = payload.Split('|');
+        if (parts.Length != 2)
+        {
+            return;
+        }
+
+        var sourceName = parts[0];
+        var targetName = parts[1];
+        if (string.IsNullOrWhiteSpace(sourceName) || string.IsNullOrWhiteSpace(targetName))
+        {
+            return;
+        }
+
+        var matchingIds = _rows
+            .Where(r => r.IsAnalyzed
+                        && !string.IsNullOrWhiteSpace(r.PersonLabel)
+                        && GetPersonDisplayName(r.PersonLabel).Equals(sourceName, StringComparison.OrdinalIgnoreCase))
+            .Select(r => r.PersonLabel)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var personId in matchingIds)
+        {
+            _personNames[personId] = targetName;
+        }
+
+        foreach (var row in _rows.Where(r => GetPersonDisplayName(r.PersonLabel).Equals(sourceName, StringComparison.OrdinalIgnoreCase)))
+        {
+            row.Photo.Analysis.PersonLabel = targetName;
+            row.Refresh();
+        }
+
+        await SavePersonNamesAsync();
+        foreach (var personId in matchingIds)
+        {
+            await SubmitPersonRenameAsync(personId, targetName);
+        }
+        await SaveStateAsync();
+        RebuildGroups();
+        ApplyFilters();
+        StatusText.Text = $"人物已合并: {sourceName} -> {targetName}";
     }
 
     private async void ArchiveGroupTo_OnClick(object sender, RoutedEventArgs e)
@@ -473,5 +592,26 @@ public partial class MainWindow
             "black" => "#2D3436",
             _ => "#7F8C8D",
         };
+    }
+
+    private static string GetDeviceLabel(PhotoRow row)
+    {
+        var meta = row.Photo.Metadata;
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(meta.CameraMake))
+        {
+            parts.Add(meta.CameraMake.Trim());
+        }
+        if (!string.IsNullOrWhiteSpace(meta.CameraModel))
+        {
+            parts.Add(meta.CameraModel.Trim());
+        }
+
+        if (parts.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(' ', parts);
     }
 }

@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS Image (
     ShutterSpeed TEXT NULL,
     FocalLength TEXT NULL,
     WhiteBalance TEXT NULL,
+    CameraMake TEXT NULL,
     CameraModel TEXT NULL,
     LensModel TEXT NULL
 );

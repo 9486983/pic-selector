@@ -50,6 +50,7 @@ class AIEngine:
             "portrait_feedback": 0,
         }
         self.face_identities: dict[str, list[float]] = {}
+        self.image_person_map: dict[str, str] = {}
         self.next_person_id = 1
         self._load_learning_state()
         self._ensure_weight_defaults()
@@ -103,7 +104,8 @@ class AIEngine:
         style_label = self._extract_feature_str(plugin_outputs, "curation", "style_label", default="unknown")
         color_label = self._extract_feature_str(plugin_outputs, "curation", "color_label", default="unknown")
         dominant_colors = self._extract_feature_list(plugin_outputs, "curation", "dominant_colors", default=[])
-        person_label = self._resolve_person_label(face_signature, person_count)
+        phash = self._perceptual_hash(image)
+        person_label = self._resolve_person_label(face_signature, person_count, phash)
 
         person_score = min(1.0, person_count / 2.0)
         overall_score = (
@@ -314,6 +316,7 @@ class AIEngine:
             self.waste_thresholds.update(state.get("waste_thresholds", {}))
             self.feedback_stats.update(state.get("feedback_stats", {}))
             self.face_identities.update(state.get("face_identities", {}))
+            self.image_person_map.update(state.get("image_person_map", {}))
             self.next_person_id = int(state.get("next_person_id", self.next_person_id))
         except Exception:
             pass
@@ -340,6 +343,7 @@ class AIEngine:
             "waste_thresholds": self.waste_thresholds,
             "feedback_stats": self.feedback_stats,
             "face_identities": self.face_identities,
+            "image_person_map": self.image_person_map,
             "next_person_id": self.next_person_id,
         }
         try:
@@ -347,7 +351,14 @@ class AIEngine:
         except Exception:
             pass
 
-    def _resolve_person_label(self, face_signature: list, person_count: int) -> str:
+    def _resolve_person_label(self, face_signature: list, person_count: int, phash: str) -> str:
+        if phash:
+            if phash in self.image_person_map:
+                return self.image_person_map[phash]
+            near = self._find_phash_match(phash)
+            if near is not None:
+                return self.image_person_map[near]
+
         if person_count <= 0 or not face_signature:
             return "none"
 
@@ -372,13 +383,119 @@ class AIEngine:
                 best_sim = sim
                 best_label = label
 
-        if best_label and best_sim >= 0.90:
+        if best_label and best_sim >= 0.88:
             prev = np.asarray(self.face_identities[best_label], dtype=np.float32)
             merged = (prev * 0.75) + (query * 0.25)
             self.face_identities[best_label] = merged.tolist()
+            if phash:
+                self.image_person_map[phash] = best_label
             return best_label
 
         new_label = f"person_{self.next_person_id}"
         self.next_person_id += 1
         self.face_identities[new_label] = query.tolist()
+        if phash:
+            self.image_person_map[phash] = new_label
         return new_label
+
+    def rename_person(self, old_label: str, new_label: str) -> dict:
+        old = (old_label or "").strip()
+        new = (new_label or "").strip()
+        if not new:
+            return {"status": "ignored", "reason": "empty_new_label"}
+        if not old or old == new:
+            return {"status": "noop", "label": new}
+
+        if old in self.face_identities:
+            vector = self.face_identities.pop(old)
+            if new in self.face_identities:
+                prev = np.asarray(self.face_identities[new], dtype=np.float32)
+                incoming = np.asarray(vector, dtype=np.float32)
+                merged = (prev * 0.6) + (incoming * 0.4)
+                self.face_identities[new] = merged.tolist()
+                status = "merged"
+            else:
+                self.face_identities[new] = vector
+                status = "renamed"
+            if self.image_person_map:
+                for key, val in list(self.image_person_map.items()):
+                    if val == old:
+                        self.image_person_map[key] = new
+            self._save_learning_state()
+            return {"status": status, "label": new}
+
+        return {"status": "not_found", "label": new}
+
+    def assign_person(self, image_path: str, new_label: str) -> dict:
+        label = (new_label or "").strip()
+        if not label:
+            return {"status": "ignored", "reason": "empty_label"}
+
+        image = cv2.imread(str(image_path))
+        if image is None:
+            return {"status": "error", "reason": "decode_failed"}
+
+        phash = self._perceptual_hash(image)
+        if phash:
+            self.image_person_map[phash] = label
+
+        face_signature = []
+        for plugin in self.plugins:
+            if getattr(plugin, "name", "") == "yolo":
+                try:
+                    output = plugin.analyze(str(image_path), image)
+                    face_signature = output.features.get("face_signature", [])
+                except Exception:
+                    face_signature = []
+                break
+
+        if face_signature:
+            try:
+                query = np.asarray(face_signature, dtype=np.float32)
+                if label in self.face_identities:
+                    prev = np.asarray(self.face_identities[label], dtype=np.float32)
+                    merged = (prev * 0.7) + (query * 0.3)
+                    self.face_identities[label] = merged.tolist()
+                else:
+                    self.face_identities[label] = query.tolist()
+            except Exception:
+                pass
+
+        self._save_learning_state()
+        return {"status": "ok", "label": label}
+
+    @staticmethod
+    def _perceptual_hash(image: np.ndarray) -> str:
+        try:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            resized = cv2.resize(gray, (32, 32), interpolation=cv2.INTER_AREA)
+            dct = cv2.dct(np.float32(resized))
+            block = dct[:8, :8]
+            med = float(np.median(block))
+            bits = (block > med).flatten().tolist()
+            value = 0
+            for bit in bits:
+                value = (value << 1) | (1 if bit else 0)
+            return f"{value:016x}"
+        except Exception:
+            return ""
+
+    def _find_phash_match(self, phash: str, max_distance: int = 6) -> str | None:
+        try:
+            target = int(phash, 16)
+        except Exception:
+            return None
+
+        best_key = None
+        best_dist = max_distance + 1
+        for key in self.image_person_map.keys():
+            try:
+                val = int(key, 16)
+            except Exception:
+                continue
+            dist = (target ^ val).bit_count()
+            if dist < best_dist:
+                best_dist = dist
+                best_key = key
+
+        return best_key if best_key is not None and best_dist <= max_distance else None

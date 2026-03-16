@@ -210,69 +210,7 @@ public partial class MainWindow
     {
         var key = _selectedFilterKey;
         var scoped = GetLibraryScopedRows();
-        IEnumerable<PhotoRow> filtered = scoped;
-
-        if (key == "all")
-        {
-            filtered = scoped;
-        }
-        else if (key == "unanalyzed")
-        {
-            filtered = scoped.Where(r => !r.IsAnalyzed);
-        }
-        else if (key.StartsWith("face:", StringComparison.OrdinalIgnoreCase))
-        {
-            var mode = key.Split(':')[1];
-            filtered = mode switch
-            {
-                "any" => scoped.Where(r => r.FaceCount > 0),
-                "multi" => scoped.Where(r => r.FaceCount > 1),
-                "none" => scoped.Where(r => r.IsAnalyzed && r.FaceCount == 0),
-                _ => scoped,
-            };
-        }
-        else if (key.StartsWith("personname:", StringComparison.OrdinalIgnoreCase))
-        {
-            var person = key["personname:".Length..];
-            filtered = scoped.Where(r => GetPersonDisplayName(r.PersonLabel).Equals(person, StringComparison.OrdinalIgnoreCase));
-        }
-        else if (key.StartsWith("waste:", StringComparison.OrdinalIgnoreCase))
-        {
-            var flag = key.EndsWith("true", StringComparison.OrdinalIgnoreCase);
-            filtered = scoped.Where(r => r.IsAnalyzed && r.IsWaste == flag);
-        }
-        else if (key.StartsWith("style:", StringComparison.OrdinalIgnoreCase))
-        {
-            var style = key["style:".Length..];
-            filtered = scoped.Where(r => CanonicalGroup("style", r.StyleLabel).Equals(style, StringComparison.OrdinalIgnoreCase));
-        }
-        else if (key.StartsWith("color:", StringComparison.OrdinalIgnoreCase))
-        {
-            var color = key["color:".Length..];
-            filtered = scoped.Where(r => CanonicalGroup("color", r.ColorLabel).Equals(color, StringComparison.OrdinalIgnoreCase));
-        }
-        else if (key.StartsWith("device:", StringComparison.OrdinalIgnoreCase))
-        {
-            var device = key["device:".Length..];
-            filtered = scoped.Where(r => GetDeviceLabel(r).Equals(device, StringComparison.OrdinalIgnoreCase));
-        }
-        else if (key.StartsWith("rating:", StringComparison.OrdinalIgnoreCase))
-        {
-            var ratingText = key["rating:".Length..];
-            if (int.TryParse(ratingText, out var rating))
-            {
-                filtered = rating <= 0
-                    ? scoped.Where(r => r.Rating <= 0)
-                    : scoped.Where(r => r.Rating == rating);
-            }
-        }
-        else if (key.StartsWith("top:", StringComparison.OrdinalIgnoreCase))
-        {
-            var scopedList = scoped.ToList();
-            var count = Math.Max(1, (int)Math.Ceiling(scopedList.Count * 0.1));
-            filtered = scopedList.Where(r => r.IsAnalyzed).OrderByDescending(r => r.OverallScore).Take(count);
-        }
-
+        var filtered = FilterRowsByKey(scoped, key);
         filtered = ApplySort(filtered);
 
         _visibleRows.Clear();
@@ -284,6 +222,81 @@ public partial class MainWindow
         StatusText.Text = $"当前筛选: {key}, 数量={_visibleRows.Count}";
     }
 
+    private IEnumerable<PhotoRow> FilterRowsByKey(IEnumerable<PhotoRow> scoped, string key)
+    {
+        if (key == "all")
+        {
+            return scoped;
+        }
+
+        if (key == "unanalyzed")
+        {
+            return scoped.Where(r => !r.IsAnalyzed);
+        }
+
+        if (key.StartsWith("face:", StringComparison.OrdinalIgnoreCase))
+        {
+            var mode = key.Split(':')[1];
+            return mode switch
+            {
+                "any" => scoped.Where(r => r.FaceCount > 0),
+                "multi" => scoped.Where(r => r.FaceCount > 1),
+                "none" => scoped.Where(r => r.IsAnalyzed && r.FaceCount == 0),
+                _ => scoped,
+            };
+        }
+
+        if (key.StartsWith("personname:", StringComparison.OrdinalIgnoreCase))
+        {
+            var person = key["personname:".Length..];
+            return scoped.Where(r => GetPersonDisplayName(r.PersonLabel).Equals(person, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (key.StartsWith("waste:", StringComparison.OrdinalIgnoreCase))
+        {
+            var flag = key.EndsWith("true", StringComparison.OrdinalIgnoreCase);
+            return scoped.Where(r => r.IsAnalyzed && r.IsWaste == flag);
+        }
+
+        if (key.StartsWith("style:", StringComparison.OrdinalIgnoreCase))
+        {
+            var style = key["style:".Length..];
+            return scoped.Where(r => CanonicalGroup("style", r.StyleLabel).Equals(style, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (key.StartsWith("color:", StringComparison.OrdinalIgnoreCase))
+        {
+            var color = key["color:".Length..];
+            return scoped.Where(r => CanonicalGroup("color", r.ColorLabel).Equals(color, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (key.StartsWith("device:", StringComparison.OrdinalIgnoreCase))
+        {
+            var device = key["device:".Length..];
+            return scoped.Where(r => GetDeviceLabel(r).Equals(device, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (key.StartsWith("rating:", StringComparison.OrdinalIgnoreCase))
+        {
+            var ratingText = key["rating:".Length..];
+            if (int.TryParse(ratingText, out var rating))
+            {
+                return rating <= 0
+                    ? scoped.Where(r => r.Rating <= 0)
+                    : scoped.Where(r => r.Rating == rating);
+            }
+        }
+
+        if (key.StartsWith("top:", StringComparison.OrdinalIgnoreCase))
+        {
+            var scopedList = scoped.ToList();
+            var count = Math.Max(1, (int)Math.Ceiling(scopedList.Count * 0.1));
+            return scopedList.Where(r => r.IsAnalyzed).OrderByDescending(r => r.OverallScore).Take(count);
+        }
+
+        return scoped;
+    }
+
     private IEnumerable<PhotoRow> ApplySort(IEnumerable<PhotoRow> rows)
     {
         return _sortKey switch
@@ -293,6 +306,7 @@ public partial class MainWindow
             "exposure_desc" => rows.OrderByDescending(r => r.Photo.Analysis.ExposureScore),
             "face_desc" => rows.OrderByDescending(r => r.FaceCount),
             "rating_desc" => rows.OrderByDescending(r => r.Rating).ThenByDescending(r => r.OverallScore),
+            "captured_desc" => rows.OrderByDescending(r => r.Photo.Metadata.CapturedAt ?? r.Photo.ImportedAt),
             "name_asc" => rows.OrderBy(r => r.FileName, StringComparer.OrdinalIgnoreCase),
             _ => rows.OrderByDescending(r => r.OverallScore),
         };
@@ -359,6 +373,21 @@ public partial class MainWindow
 
         GroupList.ContextMenu.Items.Clear();
 
+        var scoped = GetLibraryScopedRows();
+        var targetRows = FilterRowsByKey(scoped, selected.Key).ToList();
+        if (targetRows.Count > 0)
+        {
+            var selectAll = new MenuItem { Header = "全部选中", Tag = selected.Key };
+            selectAll.Click += SelectAllInGroup_OnClick;
+            GroupList.ContextMenu.Items.Add(selectAll);
+
+            var clearAll = new MenuItem { Header = "全部取消", Tag = selected.Key };
+            clearAll.Click += ClearAllInGroup_OnClick;
+            GroupList.ContextMenu.Items.Add(clearAll);
+
+            GroupList.ContextMenu.Items.Add(new Separator());
+        }
+
         if (selected.Key.StartsWith("personname:", StringComparison.OrdinalIgnoreCase))
         {
             var personName = selected.Key["personname:".Length..];
@@ -423,6 +452,40 @@ public partial class MainWindow
         }
 
         GroupList.ContextMenu.Items.Add(parent);
+    }
+
+    private async void SelectAllInGroup_OnClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuItem)?.Tag is not string key)
+        {
+            return;
+        }
+
+        var rows = FilterRowsByKey(GetLibraryScopedRows(), key).ToList();
+        foreach (var row in rows)
+        {
+            row.Photo.Analysis.IsPicked = true;
+            row.Refresh();
+        }
+
+        await SaveStateAsync();
+    }
+
+    private async void ClearAllInGroup_OnClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuItem)?.Tag is not string key)
+        {
+            return;
+        }
+
+        var rows = FilterRowsByKey(GetLibraryScopedRows(), key).ToList();
+        foreach (var row in rows)
+        {
+            row.Photo.Analysis.IsPicked = false;
+            row.Refresh();
+        }
+
+        await SaveStateAsync();
     }
 
     private async void RenamePerson_OnClick(object sender, RoutedEventArgs e)

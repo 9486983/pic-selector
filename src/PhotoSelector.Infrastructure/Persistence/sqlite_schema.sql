@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS Analysis (
     IsWaste INTEGER,
     WasteReason TEXT,
     Rating INTEGER,
+    IsPicked INTEGER,
     RawJson TEXT,
     FOREIGN KEY(ImageId) REFERENCES Image(Id) ON DELETE CASCADE
 );

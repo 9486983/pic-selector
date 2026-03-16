@@ -6,11 +6,7 @@
         xmlns:conv="clr-namespace:PhotoSelector.App.Converters"
         mc:Ignorable="d"
         x:Name="RootWindow"
-        Title="Photo Selector V3"
-        Height="860"
-        Width="1500"
-        MinHeight="720"
-        MinWidth="1180"
+        Title="Photo Selector"
         Background="#F5F7FB"
         WindowStyle="SingleBorderWindow"
         ResizeMode="CanResize">
@@ -18,8 +14,11 @@
         <conv:RatingStarConverter x:Key="RatingStarConverter" />
         <conv:HexToBrushConverter x:Key="HexToBrushConverter" />
         <conv:StringHasValueToVisibilityConverter x:Key="StringHasValueToVisibilityConverter" />
+        <conv:ThreeTwoHeightConverter x:Key="ThreeTwoHeightConverter" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <Style x:Key="ThumbListBoxItemStyleWithMenu" TargetType="ListBoxItem" BasedOn="{StaticResource ThumbListBoxItemStyle}">
             <EventSetter Event="PreviewMouseRightButtonDown" Handler="PhotoListItem_OnPreviewMouseRightButtonDown"/>
+            <EventSetter Event="MouseDoubleClick" Handler="PhotoListItem_OnMouseDoubleClick"/>
         </Style>
     </Window.Resources>
 
@@ -32,13 +31,13 @@
             </Grid.RowDefinitions>
 
             <DockPanel Grid.Row="0" LastChildFill="False" Margin="12,12,12,8">
-                <Button Name="BackToGalleryButton" Width="120" Height="34" Margin="0,0,8,0" Content="返回图库" Click="BackToGalleryButton_OnClick" Visibility="Collapsed"/>
-                <Button Name="ImportButton" Width="120" Height="34" Margin="0,0,8,0" Content="导入文件夹" Click="ImportButton_OnClick"/>
-                <Button Name="AnalyzeSelectedButton" Width="120" Height="34" Margin="0,0,8,0" Content="分析选中" Click="AnalyzeSelectedButton_OnClick"/>
-                <Button Name="AnalyzeAllButton" Width="120" Height="34" Margin="0,0,8,0" Content="分析当前" Click="AnalyzeAllButton_OnClick"/>
-                <Button Name="ApplyRuleButton" Width="120" Height="34" Margin="0,0,8,0" Content="应用规则" Click="ApplyRuleButton_OnClick"/>
-                <Button Name="ExportButton" Width="140" Height="34" Margin="0,0,8,0" Content="导出筛选结果" Click="ExportButton_OnClick"/>
-                <TextBox Name="RuleTextBox" Width="520" Height="34" VerticalContentAlignment="Center" Text="overall&gt;0.65 AND sharpness&gt;0.4 AND is_waste==false" />
+                <Button Name="BackToGalleryButton" Style="{StaticResource FlutterButton}" Margin="0,0,8,0" Content="返回图库" Click="BackToGalleryButton_OnClick" Visibility="Collapsed"/>
+                <Button Name="ImportButton" Style="{StaticResource FlutterButton}" Margin="0,0,8,0" Content="导入文件夹" Click="ImportButton_OnClick"/>
+                <Button Name="AnalyzeSelectedButton" Style="{StaticResource FlutterButton}" Margin="0,0,8,0" Content="分析选中" Click="AnalyzeSelectedButton_OnClick"/>
+                <Button Name="AnalyzeAllButton" Style="{StaticResource FlutterButton}" Margin="0,0,8,0" Content="分析当前" Click="AnalyzeAllButton_OnClick"/>
+                <Button Name="ApplyRuleButton" Style="{StaticResource FlutterButton}" Margin="0,0,8,0" Content="应用规则" Click="ApplyRuleButton_OnClick"/>
+                <Button Name="ExportButton" Style="{StaticResource FlutterButton}" Margin="0,0,8,0" Content="导出筛选结果" Click="ExportButton_OnClick"/>
+                <TextBox Name="RuleTextBox" VerticalContentAlignment="Center" Text="overall&gt;0.65 AND sharpness&gt;0.4 AND is_waste==false" />
             </DockPanel>
 
             <Grid Grid.Row="1" Margin="12,0,12,8">
@@ -62,10 +61,12 @@
                                 </ListBox.ItemsPanel>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Width="230" Height="230" Margin="0,0,12,12" BorderBrush="#D9D9D9" BorderThickness="1" CornerRadius="10" Background="White">
-                                            <Grid>
+                                        <Border Width="300" Height="270" Padding="4" BorderBrush="#D9D9D9" BorderThickness="1" CornerRadius="10" Background="White">
+                                            <Grid Width="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}"
+                                                  MaxWidth="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}"
+                                                  ClipToBounds="True">
                                                 <Grid.Resources>
-                                                    <Style TargetType="Button" x:Key="HoverCardActionBtn">
+                                                    <Style TargetType="Button" x:Key="HoverCardActionBtn" BasedOn="{StaticResource FlutterButton}">
                                                         <Setter Property="Opacity" Value="0"/>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsMouseOver}" Value="True">
@@ -74,15 +75,21 @@
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Grid.Resources>
-                                                <Border Height="150" Margin="8" Background="#F2F2F2" CornerRadius="8" VerticalAlignment="Top">
-                                                    <Image Source="{Binding CoverPath}" Stretch="UniformToFill"/>
-                                                </Border>
-                                                <StackPanel VerticalAlignment="Bottom" Margin="10,0,10,10">
-                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <StackPanel Margin="4,4,8,6" HorizontalAlignment="Stretch">
+                                                    <Border Height="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth, Converter={StaticResource ThreeTwoHeightConverter}}"
+                                                            Background="#FFFFFF"
+                                                            CornerRadius="8"
+                                                            ClipToBounds="True">
+                                                        <Image Source="{Binding CoverPath}"
+                                                               Stretch="Uniform"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <TextBlock Margin="0,6,0,0" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                                     <TextBlock Text="{Binding FolderPath}" FontSize="11" Foreground="#666" TextTrimming="CharacterEllipsis"/>
                                                 </StackPanel>
-                                                <Button Width="72" Height="28" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10" Style="{StaticResource HoverCardActionBtn}" Content="进入" Click="OpenLibraryFolder_OnClick" CommandParameter="{Binding}"/>
-                                                <Button Width="28" Height="28" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10" Style="{StaticResource HoverCardActionBtn}" Content="⋯" Click="OpenLibraryMenu_OnClick" Tag="{Binding}">
+                                                <Button HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8, 12" Style="{StaticResource HoverCardActionBtn}" Content="进入" Click="OpenLibraryFolder_OnClick" CommandParameter="{Binding}"/>
+                                                <Button HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="24,50" Style="{StaticResource HoverCardActionBtn}" Content="..." Click="OpenLibraryMenu_OnClick" Tag="{Binding}">
                                                     <Button.ContextMenu>
                                                         <ContextMenu>
                                                             <MenuItem Header="进入文件夹" Click="OpenLibraryFolderFromMenu_OnClick" CommandParameter="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
@@ -103,9 +110,9 @@
 
                 <Grid Name="FolderPage" Visibility="Collapsed" SizeChanged="FolderPage_OnSizeChanged">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="280" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition x:Name="DetailsColumn" Width="390" />
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="4*"/>
+                        <ColumnDefinition Width="1*" x:Name="DetailsColumn" />
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,10,0" Background="{StaticResource CardBg}">
@@ -145,8 +152,7 @@
                                                     </Style>
                                                 </Border.Style>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <Ellipse Width="11"
-                                                             Height="11"
+                                                    <Ellipse
                                                              Margin="0,0,6,0"
                                                              Fill="{Binding ColorSwatch, Converter={StaticResource HexToBrushConverter}}"
                                                              Stroke="#B4C1D1"
@@ -176,20 +182,21 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Name="FolderTitleText" VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold"/>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                    <ToggleButton Name="ToggleDetailsButton" Content="详情" Width="64" Height="30" Margin="0,0,12,0" Click="ToggleDetailsButton_OnClick"/>
+                                    <Button Name="FinishSelectionButton" Content="完成选片" Margin="0,0,12,0" Click="FinishSelectionButton_OnClick" Style="{StaticResource FlutterButton}"/>
                                     <TextBlock Text="排序" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <ComboBox Name="SortComboBox" Width="130" SelectionChanged="SortComboBox_OnSelectionChanged" SelectedIndex="0" Margin="0,0,10,0">
+                                    <ComboBox Name="SortComboBox" SelectionChanged="SortComboBox_OnSelectionChanged" SelectedIndex="0" Margin="0,0,10,0" AllowDrop="True">
                                         <ComboBoxItem Tag="overall_desc">综合分 ↓</ComboBoxItem>
                                         <ComboBoxItem Tag="overall_asc">综合分 ↑</ComboBoxItem>
                                         <ComboBoxItem Tag="sharpness_desc">清晰度 ↓</ComboBoxItem>
                                         <ComboBoxItem Tag="exposure_desc">曝光 ↓</ComboBoxItem>
                                         <ComboBoxItem Tag="face_desc">人数 ↓</ComboBoxItem>
                                         <ComboBoxItem Tag="rating_desc">星级 ↓</ComboBoxItem>
+                                        <ComboBoxItem Tag="captured_desc">拍摄时间 ↓</ComboBoxItem>
                                         <ComboBoxItem Tag="name_asc">文件名 ↑</ComboBoxItem>
                                     </ComboBox>
                                     <TextBlock Text="每排数量" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <Slider Name="ColumnsSlider" Minimum="1" Maximum="10" Value="5" Width="120" IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="ColumnsSlider_OnValueChanged"/>
-                                    <TextBlock Name="ColumnsText" Margin="6,0,0,0" VerticalAlignment="Center" MinWidth="20"/>
+                                    <Slider Name="ColumnsSlider" Minimum="1" Maximum="10" Width="100" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="ColumnsSlider_OnValueChanged"/>
+                                    <TextBlock Name="ColumnsText" Margin="6,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Grid>
 
@@ -211,7 +218,7 @@
                                               MaxWidth="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}"
                                               ClipToBounds="True">
                                             <Grid.Resources>
-                                                <Style TargetType="Button" x:Key="HoverActionBtn">
+                                                <Style TargetType="Button" x:Key="HoverActionBtn" BasedOn="{StaticResource FlutterButton}">
                                                     <Setter Property="Opacity" Value="0"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsMouseOver}" Value="True">
@@ -227,12 +234,18 @@
                                                     <Setter Property="Foreground" Value="#D49B00"/>
                                                 </Style>
                                             </Grid.Resources>
-                                            <StackPanel Margin="8,8,8,6"
-                                                        HorizontalAlignment="Stretch"
-                                                        Width="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}"
-                                                        MaxWidth="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth}">
-                                                <Border Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=PhotoThumbHeight}" Background="Transparent" CornerRadius="6" ClipToBounds="True">
-                                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform"/>
+                                            <StackPanel Margin="4,4,8,6"
+                                                        HorizontalAlignment="Stretch">
+                                                <Border Height="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=ActualWidth, Converter={StaticResource ThreeTwoHeightConverter}}"
+                                                        Background="Transparent"
+                                                        BorderBrush="#D6DDE8"
+                                                        BorderThickness="1"
+                                                        CornerRadius="8"
+                                                        ClipToBounds="True">
+                                                    <Image Source="{Binding Thumbnail}"
+                                                           Stretch="UniformToFill"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
                                                 </Border>
                                                 <TextBlock Margin="0,6,0,0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding FileName}"/>
                                                 <TextBlock Foreground="#444" FontSize="12" Text="{Binding ScoreBadge}"/>
@@ -260,18 +273,41 @@
                                                         <Button Style="{StaticResource StarBtn}" Content="{Binding Rating, Converter={StaticResource RatingStarConverter}, ConverterParameter=5}" Click="SetRating_OnClick" CommandParameter="{Binding}" Tag="5"/>
                                                     </StackPanel>
                                                     <StackPanel x:Name="SwatchPanel" Grid.Column="1" Orientation="Horizontal" Margin="0,2,0,0" HorizontalAlignment="Right">
-                                                        <Ellipse Width="12" Height="12" Margin="0,2,4,0" Fill="{Binding Color1, Converter={StaticResource HexToBrushConverter}}" Visibility="{Binding Color1, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
-                                                        <Ellipse Width="12" Height="12" Margin="0,2,4,0" Fill="{Binding Color2, Converter={StaticResource HexToBrushConverter}}" Visibility="{Binding Color2, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
-                                                        <Ellipse Width="12" Height="12" Margin="0,2,4,0" Fill="{Binding Color3, Converter={StaticResource HexToBrushConverter}}" Visibility="{Binding Color3, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
-                                                        <Ellipse Width="12" Height="12" Margin="0,2,4,0" Fill="{Binding Color4, Converter={StaticResource HexToBrushConverter}}" Visibility="{Binding Color4, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
-                                                        <Ellipse Width="12" Height="12" Margin="0,2,0,0" Fill="{Binding Color5, Converter={StaticResource HexToBrushConverter}}" Visibility="{Binding Color5, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                        <Ellipse Width="{Binding ElementName=RootWindow, Path=FontSize}"
+                                                                 Height="{Binding ElementName=RootWindow, Path=FontSize}"
+                                                                 Margin="0,2,3,0"
+                                                                 Fill="{Binding Color1, Converter={StaticResource HexToBrushConverter}}"
+                                                                 Visibility="{Binding Color1, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                        <Ellipse Width="{Binding ElementName=RootWindow, Path=FontSize}"
+                                                                 Height="{Binding ElementName=RootWindow, Path=FontSize}"
+                                                                 Margin="0,2,3,0"
+                                                                 Fill="{Binding Color2, Converter={StaticResource HexToBrushConverter}}"
+                                                                 Visibility="{Binding Color2, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                        <Ellipse Width="{Binding ElementName=RootWindow, Path=FontSize}"
+                                                                 Height="{Binding ElementName=RootWindow, Path=FontSize}"
+                                                                 Margin="0,2,3,0"
+                                                                 Fill="{Binding Color3, Converter={StaticResource HexToBrushConverter}}"
+                                                                 Visibility="{Binding Color3, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                        <Ellipse Width="{Binding ElementName=RootWindow, Path=FontSize}"
+                                                                 Height="{Binding ElementName=RootWindow, Path=FontSize}"
+                                                                 Margin="0,2,3,0"
+                                                                 Fill="{Binding Color4, Converter={StaticResource HexToBrushConverter}}"
+                                                                 Visibility="{Binding Color4, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
+                                                        <Ellipse Width="{Binding ElementName=RootWindow, Path=FontSize}"
+                                                                 Height="{Binding ElementName=RootWindow, Path=FontSize}"
+                                                                 Margin="0,2,0,0"
+                                                                 Fill="{Binding Color5, Converter={StaticResource HexToBrushConverter}}"
+                                                                 Visibility="{Binding Color5, Converter={StaticResource StringHasValueToVisibilityConverter}}"/>
                                                     </StackPanel>
                                                 </Grid>
                                                 <TextBlock Foreground="#B00020" FontSize="12" Text="{Binding WasteBadge}" TextTrimming="CharacterEllipsis"/>
                                             </StackPanel>
 
-                                            <Button Width="24" Height="24" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Style="{StaticResource HoverActionBtn}" Content="⛶" Click="FullscreenPreview_OnClick" CommandParameter="{Binding}" ToolTip="全屏预览"/>
-                                            <Button Width="24" Height="24" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Style="{StaticResource HoverActionBtn}" Content="⋯" Click="OpenRowMenu_OnClick" CommandParameter="{Binding}" ToolTip="更多操作">
+                                            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8, 12" Background="#E6F4EA" BorderBrush="#7FCF9B" BorderThickness="1" CornerRadius="8" Padding="6,2" Visibility="{Binding IsPicked, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <TextBlock Text="已选" Foreground="#1F6F3D"/>
+                                            </Border>
+                                            <Button HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8, 10" Content="全屏" Style="{StaticResource HoverActionBtn}" Click="FullscreenPreview_OnClick" CommandParameter="{Binding}" ToolTip="全屏预览"/>
+                                            <Button HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12, 10" Style="{StaticResource HoverActionBtn}" Content="..." Click="OpenRowMenu_OnClick" CommandParameter="{Binding}" ToolTip="更多操作">
                                                 <Button.ContextMenu>
                                                     <ContextMenu/>
                                                 </Button.ContextMenu>
@@ -317,6 +353,7 @@
                                         <TextBlock Name="ExifShutterText" Margin="0,0,0,4"/>
                                         <TextBlock Name="ExifFocalText" Margin="0,0,0,4"/>
                                         <TextBlock Name="ExifCameraText"/>
+                                        <TextBlock Name="ExifCapturedText"/>
                                     </StackPanel>
                                 </Border>
                                 <TextBox Name="DetailRawJsonText"
@@ -329,9 +366,9 @@
                                              BorderBrush="#D5DFEE"
                                              Foreground="#1E2936"
                                              Padding="8"/>
-                                </Grid>
-                            </Border>
-                        </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </Grid>
             </Grid>
 
@@ -364,3 +401,19 @@
         </Grid>
     </Grid>
 </Window>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

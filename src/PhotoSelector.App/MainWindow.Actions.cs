@@ -459,6 +459,8 @@ public partial class MainWindow
             ExifShutterText.Text = string.Empty;
             ExifFocalText.Text = string.Empty;
             ExifCameraText.Text = string.Empty;
+            ExifCapturedText.Text = string.Empty;
+            ExifCapturedText.Visibility = Visibility.Collapsed;
             DetailRawJsonText.Text = string.Empty;
             return;
         }
@@ -489,7 +491,8 @@ public partial class MainWindow
         DetailWasteText.Text = row.IsWaste ? $"废片: {row.WasteReason}" : "废片: 否";
 
         var meta = row.Photo.Metadata;
-        var hasExif = meta.Iso.HasValue
+        var hasExif = meta.CapturedAt.HasValue
+                      || meta.Iso.HasValue
                       || !string.IsNullOrWhiteSpace(meta.Aperture)
                       || !string.IsNullOrWhiteSpace(meta.ShutterSpeed)
                       || !string.IsNullOrWhiteSpace(meta.FocalLength)
@@ -528,6 +531,10 @@ public partial class MainWindow
             var cameraText = cameraParts.Count > 0 ? $"设备: {string.Join(" / ", cameraParts)}" : string.Empty;
             ExifCameraText.Text = cameraText;
             ExifCameraText.Visibility = cameraParts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            var captured = meta.CapturedAt ?? row.Photo.ImportedAt;
+            ExifCapturedText.Text = $"拍摄时间: {captured:yyyy-MM-dd HH:mm:ss}";
+            ExifCapturedText.Visibility = Visibility.Visible;
         }
         else
         {
@@ -713,17 +720,98 @@ public partial class MainWindow
         menu.IsOpen = true;
     }
 
-    private void ToggleDetailsButton_OnClick(object sender, RoutedEventArgs e)
+    private async void PhotoListItem_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not System.Windows.Controls.Primitives.ToggleButton toggle)
+        if (sender is not ListBoxItem item || item.DataContext is not PhotoRow row)
         {
             return;
         }
 
-        var show = toggle.IsChecked != false;
-        DetailsPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        DetailsColumn.Width = show ? new GridLength(390) : new GridLength(0);
-        toggle.Content = show ? "详情" : "展开";
+        row.Photo.Analysis.IsPicked = !row.Photo.Analysis.IsPicked;
+        row.Refresh();
+        await SaveStateAsync();
+    }
+
+    private void ToggleDetailsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        //if (sender is not System.Windows.Controls.Primitives.ToggleButton toggle)
+        //{
+        //    return;
+        //}
+
+        //var show = toggle.IsChecked != false;
+        //DetailsPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        //DetailsColumn.Width = show ? GridLength.Auto : new GridLength(0);
+        //toggle.Content = show ? "收起详情" : "展开详情";
+    }
+
+    private async void FinishSelectionButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_selectedLibraryKey) || !Directory.Exists(_selectedLibraryKey))
+        {
+            StatusText.Text = "当前没有可导出的文件夹";
+            return;
+        }
+
+        var baseFolder = ResolveFinishBaseFolder(_selectedLibraryKey);
+        var finishFolder = Path.Combine(baseFolder, "FINISH");
+        var jpgFolder = Path.Combine(finishFolder, "JPG");
+        var rawFolder = Path.Combine(finishFolder, "RAW");
+
+        Directory.CreateDirectory(jpgFolder);
+        Directory.CreateDirectory(rawFolder);
+
+        var selected = _rows.Where(r => r.Photo.Analysis.IsPicked).ToList();
+        if (selected.Count == 0)
+        {
+            StatusText.Text = "没有已选中的照片";
+            return;
+        }
+
+        var token = BeginOperation($"复制已选照片 ({selected.Count})");
+        try
+        {
+            foreach (var row in selected)
+            {
+                token.ThrowIfCancellationRequested();
+                var ext = Path.GetExtension(row.Path);
+                var targetRoot = RawExtensions.Contains(ext) ? rawFolder : jpgFolder;
+                var dest = Path.Combine(targetRoot, Path.GetFileName(row.Path));
+                if (File.Exists(dest))
+                {
+                    continue;
+                }
+                dest = GetAvailablePath(dest);
+                File.Copy(row.Path, dest, overwrite: false);
+            }
+
+            StatusText.Text = $"已完成选片: {selected.Count} 张";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "已取消选片导出";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"选片导出失败: {ex.Message}";
+        }
+        finally
+        {
+            EndOperation(StatusText.Text);
+        }
+    }
+
+    private static string ResolveFinishBaseFolder(string libraryFolder)
+    {
+        var folderName = new DirectoryInfo(libraryFolder).Name;
+        if (folderName.Equals("JPG", StringComparison.OrdinalIgnoreCase)
+            || folderName.Equals("JPEG", StringComparison.OrdinalIgnoreCase)
+            || RawExtensions.Contains("." + folderName))
+        {
+            return Directory.GetParent(libraryFolder)?.FullName ?? libraryFolder;
+        }
+
+        return libraryFolder;
     }
 
     private void ThumbFooter_OnSizeChanged(object sender, SizeChangedEventArgs e)

@@ -133,7 +133,7 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
 
         var analysisCmd = connection.CreateCommand();
         analysisCmd.CommandText = """
-            SELECT ImageId, OverallScore, SharpnessScore, ExposureScore, EyesClosed, IsDuplicate, IsAnalyzed, FaceCount, PersonLabel, StyleLabel, ColorLabel, DominantColorsJson, AutoClass, IsWaste, WasteReason, Rating, RawJson
+            SELECT ImageId, OverallScore, SharpnessScore, ExposureScore, EyesClosed, IsDuplicate, IsAnalyzed, FaceCount, PersonLabel, StyleLabel, ColorLabel, DominantColorsJson, AutoClass, IsWaste, WasteReason, Rating, IsPicked, RawJson
             FROM Analysis;
             """;
         await using (var reader = await analysisCmd.ExecuteReaderAsync(cancellationToken))
@@ -163,7 +163,8 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
                     IsWaste = !reader.IsDBNull(13) && reader.GetInt32(13) == 1,
                     WasteReason = reader.IsDBNull(14) ? string.Empty : reader.GetString(14),
                     Rating = reader.IsDBNull(15) ? 0 : reader.GetInt32(15),
-                    RawJson = reader.IsDBNull(16) ? string.Empty : reader.GetString(16)
+                    IsPicked = !reader.IsDBNull(16) && reader.GetInt32(16) == 1,
+                    RawJson = reader.IsDBNull(17) ? string.Empty : reader.GetString(17)
                 };
             }
         }
@@ -250,8 +251,8 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
         var cmd = connection.CreateCommand();
         cmd.Transaction = (SqliteTransaction)tx;
         cmd.CommandText = """
-            INSERT INTO Analysis(ImageId, OverallScore, SharpnessScore, ExposureScore, EyesClosed, IsDuplicate, IsAnalyzed, FaceCount, PersonLabel, StyleLabel, ColorLabel, DominantColorsJson, AutoClass, IsWaste, WasteReason, Rating, RawJson)
-            VALUES ($id, $overall, $sharpness, $exposure, $eyesClosed, $duplicate, $isAnalyzed, $faceCount, $personLabel, $styleLabel, $colorLabel, $dominantColorsJson, $autoClass, $isWaste, $wasteReason, $rating, $rawJson)
+            INSERT INTO Analysis(ImageId, OverallScore, SharpnessScore, ExposureScore, EyesClosed, IsDuplicate, IsAnalyzed, FaceCount, PersonLabel, StyleLabel, ColorLabel, DominantColorsJson, AutoClass, IsWaste, WasteReason, Rating, IsPicked, RawJson)
+            VALUES ($id, $overall, $sharpness, $exposure, $eyesClosed, $duplicate, $isAnalyzed, $faceCount, $personLabel, $styleLabel, $colorLabel, $dominantColorsJson, $autoClass, $isWaste, $wasteReason, $rating, $isPicked, $rawJson)
             ON CONFLICT(ImageId) DO UPDATE SET
                 OverallScore = excluded.OverallScore,
                 SharpnessScore = excluded.SharpnessScore,
@@ -268,6 +269,7 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
                 IsWaste = excluded.IsWaste,
                 WasteReason = excluded.WasteReason,
                 Rating = excluded.Rating,
+                IsPicked = excluded.IsPicked,
                 RawJson = excluded.RawJson;
             """;
         cmd.Parameters.AddWithValue("$id", photo.Id.ToString());
@@ -286,6 +288,7 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
         cmd.Parameters.AddWithValue("$isWaste", photo.Analysis.IsWaste ? 1 : 0);
         cmd.Parameters.AddWithValue("$wasteReason", photo.Analysis.WasteReason);
         cmd.Parameters.AddWithValue("$rating", photo.Analysis.Rating);
+        cmd.Parameters.AddWithValue("$isPicked", photo.Analysis.IsPicked ? 1 : 0);
         cmd.Parameters.AddWithValue("$rawJson", photo.Analysis.RawJson);
         await cmd.ExecuteNonQueryAsync(cancellationToken);
 
@@ -390,6 +393,7 @@ public sealed class SqlitePhotoRepository : IPhotoRepository
         EnsureColumn(connection, "Analysis", "IsWaste", "INTEGER");
         EnsureColumn(connection, "Analysis", "WasteReason", "TEXT");
         EnsureColumn(connection, "Analysis", "Rating", "INTEGER");
+        EnsureColumn(connection, "Analysis", "IsPicked", "INTEGER");
     }
 
     private static void EnsureColumn(SqliteConnection connection, string table, string column, string columnType)

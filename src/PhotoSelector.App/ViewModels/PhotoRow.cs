@@ -30,6 +30,7 @@ public sealed class PhotoRow(PhotoItem photo) : INotifyPropertyChanged
     public bool IsWaste => Photo.Analysis.IsWaste;
     public string WasteReason => Photo.Analysis.WasteReason;
     public int Rating => Photo.Analysis.Rating;
+    public bool IsPicked => Photo.Analysis.IsPicked;
     public BitmapImage? Thumbnail => _thumbnail ??= LoadBitmap(240);
     public string Color1 => GetColorAt(0);
     public string Color2 => GetColorAt(1);
@@ -59,6 +60,7 @@ public sealed class PhotoRow(PhotoItem photo) : INotifyPropertyChanged
         OnPropertyChanged(nameof(IsWaste));
         OnPropertyChanged(nameof(WasteReason));
         OnPropertyChanged(nameof(Rating));
+        OnPropertyChanged(nameof(IsPicked));
         OnPropertyChanged(nameof(ScoreBadge));
         OnPropertyChanged(nameof(MetaBadge));
         OnPropertyChanged(nameof(WasteBadge));

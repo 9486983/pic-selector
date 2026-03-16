@@ -1,10 +1,10 @@
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Style TargetType="Button">
         <Setter Property="Background" Value="#EEF3FA"/>
         <Setter Property="BorderBrush" Value="#D5DFEE"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="Padding" Value="0,0"/>
         <Setter Property="Foreground" Value="#1B2430"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Template">
@@ -42,7 +42,7 @@
         <Setter Property="BorderBrush" Value="#D5DFEE"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding" Value="10,4"/>
-        <Setter Property="Height" Value="34"/>
+        
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBox">
@@ -58,13 +58,12 @@
                                           Content="{TemplateBinding SelectionBoxItem}"
                                           ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"/>
                         <ToggleButton x:Name="ToggleButton"
-                                      Width="24"
                                       HorizontalAlignment="Right"
                                       Margin="4"
                                       Background="Transparent"
                                       BorderThickness="0"
                                       IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
-                            <Path Fill="#556070" Data="M 0 0 L 4 4 L 8 0 Z" Stretch="Uniform" Width="10" Height="6"/>
+                            <Path Fill="#556070" Data="M 0 0 L 4 4 L 8 0 Z" Stretch="Uniform"/>
                         </ToggleButton>
                         <Popup Name="Popup"
                                IsOpen="{TemplateBinding IsDropDownOpen}"
@@ -76,7 +75,7 @@
                                     BorderThickness="1"
                                     CornerRadius="12"
                                     Margin="0,4,0,0">
-                                <ScrollViewer CanContentScroll="True" MaxHeight="300">
+                                <ScrollViewer CanContentScroll="True">
                                     <ItemsPresenter/>
                                 </ScrollViewer>
                             </Border>
@@ -100,18 +99,18 @@
 
     <Style TargetType="Slider">
         <Setter Property="Foreground" Value="#2574A9"/>
-        <Setter Property="Height" Value="28"/>
+        
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
                     <Grid Margin="0,8,0,8">
-                        <Border Height="6" CornerRadius="3" Background="#E3EAF5"/>
+                        <Border CornerRadius="3" Background="#E3EAF5"/>
                         <Track x:Name="PART_Track">
                             <Track.DecreaseRepeatButton>
-                                <RepeatButton Command="Slider.DecreaseLarge" Background="#2574A9" Height="6" BorderThickness="0"/>
+                                <RepeatButton Command="Slider.DecreaseLarge" Background="#2574A9" BorderThickness="0"/>
                             </Track.DecreaseRepeatButton>
                             <Track.Thumb>
-                                <Thumb Width="18" Height="18" Background="White" BorderBrush="#2574A9" BorderThickness="2">
+                                <Thumb Background="White" BorderBrush="#2574A9" BorderThickness="2" Height="10" Width="10">
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
                                             <Border Background="{TemplateBinding Background}"
@@ -123,7 +122,7 @@
                                 </Thumb>
                             </Track.Thumb>
                             <Track.IncreaseRepeatButton>
-                                <RepeatButton Command="Slider.IncreaseLarge" Background="#E3EAF5" Height="6" BorderThickness="0"/>
+                                <RepeatButton Command="Slider.IncreaseLarge" Background="#E3EAF5" BorderThickness="0"/>
                             </Track.IncreaseRepeatButton>
                         </Track>
                     </Grid>
@@ -140,6 +139,39 @@
     <Style TargetType="ListBox">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <Style TargetType="Button" x:Key="FlutterButton">
+        <Setter Property="Background" Value="#F3F6FB"/>
+        <Setter Property="BorderBrush" Value="#C9D6EA"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="#1B2430"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="7, 4"
+                            CornerRadius="10">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#E5ECF8"/>
+                <Setter Property="BorderBrush" Value="#B8C9E3"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="#ECEFF4"/>
+                <Setter Property="BorderBrush" Value="#D6DCE8"/>
+                <Setter Property="Foreground" Value="#9AA4B2"/>
+                <Setter Property="Opacity" Value="0.85"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style TargetType="ListBoxItem" x:Key="ThumbListBoxItemStyle">
@@ -165,3 +197,5 @@
         </Setter>
     </Style>
 </ResourceDictionary>
+
+

@@ -319,7 +319,7 @@
                         </Grid>
                     </Border>
 
-                    <Grid Grid.Column="2" Name="DetailsPanel" Width="390">
+                    <Grid Grid.Column="2" Name="DetailsPanel">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="360" />
                             <RowDefinition Height="*" />

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31903.59
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11612.150 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
@@ -14,6 +14,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhotoSelector.Infrastructure", "src\PhotoSelector.Infrastructure\PhotoSelector.Infrastructure.csproj", "{B877D5E7-E48C-4C06-B5BF-6323A8850B54}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhotoSelector.SmokeTest", "src\PhotoSelector.SmokeTest\PhotoSelector.SmokeTest.csproj", "{B64DAFB3-8002-4D33-BF72-61EC9C5E8E01}"
+EndProject
+Project("{B7DD6F7E-DEF8-4E67-B5B7-07EF123DB6F0}") = "PhotoSelector.Setup", "src\PhotoSelector.Setup\PhotoSelector.Setup.wixproj", "{777AF288-E50F-41F1-8A87-2E19DFA4E162}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -85,6 +87,18 @@ Global
 		{B64DAFB3-8002-4D33-BF72-61EC9C5E8E01}.Release|x64.Build.0 = Release|Any CPU
 		{B64DAFB3-8002-4D33-BF72-61EC9C5E8E01}.Release|x86.ActiveCfg = Release|Any CPU
 		{B64DAFB3-8002-4D33-BF72-61EC9C5E8E01}.Release|x86.Build.0 = Release|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Debug|x64.Build.0 = Debug|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Debug|x86.Build.0 = Debug|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Release|Any CPU.Build.0 = Release|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Release|x64.ActiveCfg = Release|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Release|x64.Build.0 = Release|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Release|x86.ActiveCfg = Release|Any CPU
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -95,5 +109,9 @@ Global
 		{6D4695F4-EA90-4EBF-9B05-950F15D08A98} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{B877D5E7-E48C-4C06-B5BF-6323A8850B54} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{B64DAFB3-8002-4D33-BF72-61EC9C5E8E01} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{777AF288-E50F-41F1-8A87-2E19DFA4E162} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8924FAAF-A785-4281-A9D7-B490CD5E1FAA}
 	EndGlobalSection
 EndGlobal

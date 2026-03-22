@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <ProductName>PhotoSelector</ProductName>
+    <Manufacturer>PhotoSelector</Manufacturer>
+    <ProductVersion>1.0.0</ProductVersion>
+    <InstallFolderName>PhotoSelector</InstallFolderName>
+    <AppIconPath></AppIconPath>
+  </PropertyGroup>
+</Project>

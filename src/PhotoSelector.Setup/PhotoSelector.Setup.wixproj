@@ -1,0 +1,24 @@
+﻿<Project Sdk="WixToolset.Sdk/6.0.2">
+  <Import Project="..\..\installer\msi.config.props" Condition="Exists('..\..\installer\msi.config.props')" />
+
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <Cultures>zh-CN</Cultures>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <ProductName Condition="'$(ProductName)' == ''">PhotoSelector</ProductName>
+    <Manufacturer Condition="'$(Manufacturer)' == ''">PhotoSelector</Manufacturer>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <InstallFolderName Condition="'$(InstallFolderName)' == ''">PhotoSelector</InstallFolderName>
+    <PayloadRoot Condition="'$(PayloadRoot)' == ''">$(MSBuildThisFileDirectory)..\..\dist\msi\payload</PayloadRoot>
+    <DefineConstants>ProductName=$(ProductName);Manufacturer=$(Manufacturer);ProductVersion=$(ProductVersion);InstallFolderName=$(InstallFolderName)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <BindPath Include="$(PayloadRoot)" BindName="Payload" />
+    <Content Include="License.rtf" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+{
+  "dotnet": {
+    "version": "8.0",
+    "runtimeZipUrl": "https://download.visualstudio.microsoft.com/download/pr/xxxx/dotnet-runtime-8.0.0-win-x64.zip"
+  },
+  "python": {
+    "version": "3.11.9",
+    "embedZipUrl": "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip",
+    "getPipUrl": "https://bootstrap.pypa.io/get-pip.py"
+  }
+}
